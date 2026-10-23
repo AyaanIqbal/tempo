@@ -43,6 +43,11 @@ struct TaskInspector: View {
                     Text("Changes save automatically on this Mac.").font(.system(size: 10)).foregroundStyle(.tertiary)
                 }.padding(24)
             }
-        }.background(.background).onReceive(NotificationCenter.default.publisher(for: .newSubtask)) { _ in subtaskFocused = true }
+        }.background(.background)
+        .onExitCommand {
+            subtaskFocused = false
+            NotificationCenter.default.post(name: .focusSidebar, object: nil)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .newSubtask)) { _ in subtaskFocused = true }
     }
 }

@@ -57,7 +57,7 @@ See [Releasing Tempo](docs/RELEASING.md) for versioning, signed update packaging
 
 ## Navigating your workspace
 
-Click a sidebar view and use Up/Down to move through All tasks, Inbox, Today, and visible labels. Left collapses a branch or moves to its parent; Right expands it or enters its first child. Use Control-Command-S to focus the sidebar from the keyboard. Editing text keeps normal arrow-key behavior.
+Click a sidebar view and use Up/Down to move through All tasks, Inbox, Today, and visible labels. Left collapses a branch or moves to its parent; Right expands it or enters its first child. Use Control-Command-S to focus the sidebar from the keyboard. Editing text keeps normal arrow-key behavior. Press Escape from task entry, search, or task details/notes to return to sidebar navigation without clearing your text.
 
 Command-K searches label paths and tasks as well as commands. Select a label result to open its view (collapsed ancestors expand automatically), or a task result to open its details. Breadcrumbs show the complete workspace/label/sub-label path, with clickable parents.
 

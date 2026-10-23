@@ -41,7 +41,7 @@ struct ContentView: View {
         .sheet(isPresented: Binding(get: { store.pendingCancel != nil }, set: { if !$0 { store.pendingCancel = nil } })) { CancelTaskView(store: store) }
         .alert("Tempo", isPresented: Binding(get: { store.message != nil }, set: { if !$0 { store.message = nil } })) { Button("OK") { store.message = nil } } message: { Text(store.message ?? "") }
         .onChange(of: store.scope) { store.revealCurrentLabel() }
-        .onReceive(NotificationCenter.default.publisher(for: .focusSidebar)) { _ in sidebarFocused = true }
+        .onReceive(NotificationCenter.default.publisher(for: .focusSidebar)) { _ in returnToSidebar() }
         .onChange(of: store.focusComposer) { focus = .composer }
         .onReceive(NotificationCenter.default.publisher(for: .searchTasks)) { _ in focus = .search }
     }
@@ -119,7 +119,7 @@ struct ContentView: View {
         HStack(spacing: 10) {
             Picker("View", selection: $store.viewMode) { Label("List", systemImage: "list.bullet").tag(WorkspaceView.list); Label("Board", systemImage: "rectangle.split.3x1").tag(WorkspaceView.board); Label("Web", systemImage: "point.3.connected.trianglepath.dotted").tag(WorkspaceView.web) }.pickerStyle(.segmented).labelsHidden().frame(width: 225)
             Spacer(minLength: 0)
-            TextField("Search", text: $store.search).textFieldStyle(.roundedBorder).frame(maxWidth: 150).focused($focus, equals: .search)
+            TextField("Search", text: $store.search).textFieldStyle(.roundedBorder).frame(maxWidth: 150).focused($focus, equals: .search).onExitCommand { returnToSidebar() }
             Button { showDisplay.toggle() } label: { Label("Display", systemImage: "slider.horizontal.3").font(.system(size: 12)).padding(.vertical, 5).contentShape(Rectangle()) }
                 .buttonStyle(.plain).disabled(store.viewMode == .web)
                 .popover(isPresented: $showDisplay, arrowEdge: .bottom) {
@@ -152,7 +152,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Image(systemName: "plus").foregroundStyle(.tertiary)
-                TextField("What needs to get done?", text: $draft).textFieldStyle(.plain).focused($focus, equals: .composer).onSubmit(addTask)
+                TextField("What needs to get done?", text: $draft).textFieldStyle(.plain).focused($focus, equals: .composer).onSubmit(addTask).onExitCommand { returnToSidebar() }
                 if let acceptedLabel { Text(store.workspace.labelPath(acceptedLabel).map(\.name).joined(separator: " / ")).font(.system(size: 10)).foregroundStyle(Color.accent); Button { self.acceptedLabel = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain) }
                 Text("↵").foregroundStyle(.tertiary)
             }
@@ -162,6 +162,10 @@ struct ContentView: View {
                 }
             }
         }.padding(16).background(.background, in: RoundedRectangle(cornerRadius: 9)).overlay { RoundedRectangle(cornerRadius: 9).strokeBorder(Color.accent.opacity(0.18)) }.onChange(of: draft) { if draft.isEmpty { dismissedMatch = false; acceptedLabel = nil } }
+    }
+    private func returnToSidebar() {
+        focus = nil
+        sidebarFocused = true
     }
     private func addTask() {
         let label = acceptedLabel ?? store.workspace.labels.first { $0.id.uuidString == store.scope }?.id
