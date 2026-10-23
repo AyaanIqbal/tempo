@@ -51,6 +51,7 @@ import TempoCore
 }
 extension Notification.Name {
     static let newSubtask = Notification.Name("tempo.newSubtask")
+    static let focusTasks = Notification.Name("tempo.focusTasks")
     static let focusSidebar = Notification.Name("tempo.focusSidebar")
     static let searchTasks = Notification.Name("tempo.search")
 }

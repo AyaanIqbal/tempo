@@ -125,3 +125,43 @@ public extension Workspace {
         return scopes[min(max(index + offset, 0), scopes.count - 1)]
     }
 }
+
+public struct TaskTreeRow: Identifiable, Sendable {
+    public let task: TaskItem
+    public let depth: Int
+    public var id: UUID { task.id }
+}
+public extension Workspace {
+    func taskCount(in label: UUID) -> Int {
+        tasks.filter { labelPath(effectiveLabel($0)).contains { $0.id == label } }.count
+    }
+    func taskRows(roots: [TaskItem], collapsed: Set<UUID> = [], showResolved: Bool = true, depth: Int = 0, byImportance: Bool = false) -> [TaskTreeRow] {
+        sortedTasks(roots, byImportance: byImportance).flatMap { task in
+            guard showResolved || !task.status.isResolved else { return [TaskTreeRow]() }
+            return [TaskTreeRow(task: task, depth: depth)] + (collapsed.contains(task.id) ? [] : taskRows(roots: children(of: task.id), collapsed: collapsed, showResolved: showResolved, depth: depth + 1, byImportance: byImportance))
+        }
+    }
+    func smartMatches(for task: TaskItem) -> [TaskLabel] {
+        guard task.parentID == nil, task.smartEntryDismissed != true else { return [] }
+        return matches(for: task.title)
+    }
+    mutating func acceptSmartMatch(task id: UUID, label labelID: UUID) {
+        guard let index = tasks.firstIndex(where: { $0.id == id }), let label = smartMatches(for: tasks[index]).first(where: { $0.id == labelID }) else { return }
+        let title = String(tasks[index].title.dropFirst(label.name.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        tasks[index].title = title; tasks[index].labelID = label.id; tasks[index].smartEntryDismissed = nil
+    }
+}
+
+public extension Workspace {
+    func sortedTasks(_ tasks: [TaskItem], byImportance: Bool = false) -> [TaskItem] {
+        func rank(_ status: TaskStatus) -> Int {
+            switch status { case .inProgress: 0; case .todo: 1; case .done: 2; case .canceled: 3 }
+        }
+        return tasks.sorted {
+            if rank($0.status) != rank($1.status) { return rank($0.status) < rank($1.status) }
+            if byImportance && $0.importance != $1.importance { return $0.importance.rawValue > $1.importance.rawValue }
+            return $0.createdAt > $1.createdAt
+        }
+    }
+}

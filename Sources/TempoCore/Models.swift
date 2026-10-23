@@ -18,6 +18,7 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
     public var dueDate: Date?
     public var labelID: UUID?
     public var parentID: UUID?
+    public var smartEntryDismissed: Bool?
     public var cancellationReason = ""
     public var createdAt = Date()
     public init(title: String, parentID: UUID? = nil, labelID: UUID? = nil) { self.title = title; self.parentID = parentID; self.labelID = labelID }

@@ -37,7 +37,7 @@ swift run TempoChecks
 - Mac menu shortcuts and searchable command menu with Up/Down selection, Return to execute, and automatic scrolling. See Help → Tempo Keyboard Shortcuts.
 - Full-width sidebar navigation targets, including the padding around labels.
 - Labels use simple dot markers. Right-click a label to rename, move, or remove it directly in the sidebar.
-- Display opens a persistent property checklist: click a row to show/hide it, with separate visibility settings for list and board.
+- Property controls sit on the right of the toolbar, with search in the middle and the view selector on the left. Click Labels, Importance, Due date, or Status directly to show/hide them. Settings stay independent for list and board. Completed tasks stay visible; status ordering puts in-progress work first and completed work last.
 - Web view (⌘3): a native, zoomable map connecting labels, tasks, and subtasks. Status icons and colors distinguish open, in-progress, done, and canceled work; resolved tasks are included by default. Search and sidebar filters apply to the map. Click tasks to inspect them or their status icons to complete/reopen them.
 - Automatic local JSON saving, atomic writes, export/restore, and session undo for deletions and edits.
 
@@ -57,8 +57,22 @@ See [Releasing Tempo](docs/RELEASING.md) for versioning, signed update packaging
 
 ## Navigating your workspace
 
-Click a sidebar view and use Up/Down to move through All tasks, Inbox, Today, and visible labels. Left collapses a branch or moves to its parent; Right expands it or enters its first child. Use Control-Command-S to focus the sidebar from the keyboard. Editing text keeps normal arrow-key behavior. Press Escape from task entry, search, or task details/notes to return to sidebar navigation without clearing your text.
+Click a sidebar view and use Up/Down to move through All tasks, Inbox, Today, and visible labels. Left collapses a branch or moves to its parent. Right enters the task list. Click a branch chevron to expand it. Use Control-Command-S to focus the sidebar from the keyboard. Editing text keeps normal arrow-key behavior. Press Escape from task entry to highlight the selected/newly created task, without clearing unfinished text. Search and task details/notes return to the sidebar on Escape.
 
 Command-K searches label paths and tasks as well as commands. Select a label result to open its view (collapsed ancestors expand automatically), or a task result to open its details. Breadcrumbs show the complete workspace/label/sub-label path, with clickable parents.
 
 All tasks keeps its original caption. Inbox and Today have their own descriptions. Click the caption or pencil on any label view to customize it; Use default resets it. Captions are stored with labels, included in backups, and old data without captions still loads.
+
+## Task selection and quick entry
+
+Creating a task highlights it without opening the detail pane. New tasks appear first. Escape leaves quick entry at that selected task; Up/Down moves through visible tasks and subtasks. Left returns to the sidebar, and Right from the sidebar enters tasks. Enter, Right from a selected task, or clicking an existing task opens details. Shift-Enter (or Command-Shift-N) starts a subtask of the selected task in the composer.
+
+Completed tasks are visible by default; completed work stays visible below open tasks. Subtasks appear as nested rows and can be collapsed. Label counts include all tasks and inherited subtasks within the entire label branch, including completed/canceled tasks.
+
+Smart-entry matches can be accepted with Tab while typing or while a task is selected. Unaccepted suggestions appear next to a selected task, including after selecting it again later; Dismiss is stored per task. Accepting a suggestion assigns its label and removes its prefix from the title. Subtasks inherit labels, so their titles are not parsed into independent label paths.
+
+The label property opens a searchable, indented hierarchy instead of a flat menu. Search by label name or any parent in the path; Up/Down and Enter work in the chooser.
+
+Run `./scripts/check-interactions.sh` to verify selection versus explicit opening, new-task order, subtask navigation, completed visibility, smart matching, and persisted workspace data using a temporary workspace (not your real tasks).
+
+Summary cards count only the current view: all work in All tasks, unlabeled work in Inbox, due-today work in Today, and the full current label branch in label views. Task order is In progress, To do, Done, then Canceled; optional priority sorting applies within each status. Nested tasks follow the same ordering within their parent. Moving between sidebar and task list transfers the highlight to the active region while remembering the selected task.

@@ -3,11 +3,16 @@ import AppKit
 import UniformTypeIdentifiers
 import TempoCore
 
+enum NavigationRegion: Hashable { case sidebar, tasks, editor }
+
 enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", web = "Web" }
 
 @MainActor @Observable final class Store {
     var workspace = Workspace()
+    var activeRegion: NavigationRegion = .sidebar
     var selectedID: UUID?
+    var inspectorID: UUID?
+    var collapsedTasks: Set<UUID> = []
     var scope = "all"
     var collapsedLabels: Set<UUID> = []
     var viewMode: WorkspaceView = .list
@@ -16,7 +21,7 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
         set { viewMode = newValue ? .board : .list }
     }
     var search = ""
-    var showResolved = false
+    var showResolved = true
     var sortByImportance = false
     var showCommands = false
     var showHelp = false
@@ -26,8 +31,8 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
     var undoWorkspace: Workspace?
     private var loadFailed = false
     private let fileURL: URL
-    init() {
-        fileURL = URL.applicationSupportDirectory.appending(path: "Tempo/workspace.json")
+    init(fileURL: URL = URL.applicationSupportDirectory.appending(path: "Tempo/workspace.json")) {
+        self.fileURL = fileURL
         do {
             if FileManager.default.fileExists(atPath: fileURL.path) {
                 let loaded = try JSONDecoder().decode(Workspace.self, from: Data(contentsOf: fileURL))
@@ -36,15 +41,25 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
         } catch { loadFailed = true; message = "Could not read your saved workspace. Your data has been preserved. Restore a backup or fix the data file before editing. \(error.localizedDescription)" }
     }
     var selected: TaskItem? { workspace.tasks.first { $0.id == selectedID } }
+    var inspected: TaskItem? { workspace.tasks.first { $0.id == inspectorID } }
+    var taskRows: [TaskTreeRow] { workspace.taskRows(roots: roots, collapsed: collapsedTasks, showResolved: board || showResolved, byImportance: sortByImportance) }
     var properties: ViewProperties { board ? workspace.boardProperties : workspace.listProperties }
-    var roots: [TaskItem] {
+    var scopedTasks: [TaskItem] {
         workspace.tasks.filter { task in
-            guard task.parentID == nil else { return false }
-            let labelMatches = scope == "all" || (scope == "inbox" && workspace.effectiveLabel(task) == nil) || (scope == "today" && task.dueDate.map { Calendar.current.isDateInToday($0) } == true) || workspace.labelPath(workspace.effectiveLabel(task)).contains { $0.id.uuidString == scope }
-            let matches = task.title.localizedCaseInsensitiveContains(search) || task.notes.localizedCaseInsensitiveContains(search) || workspace.descendants(of: task.id).contains { id in workspace.tasks.first { $0.id == id }?.title.localizedCaseInsensitiveContains(search) == true }
-            return labelMatches && (search.isEmpty || matches) && (board || showResolved || !task.status.isResolved)
-        }.sorted { sortByImportance && $0.importance != $1.importance ? $0.importance.rawValue > $1.importance.rawValue : $0.createdAt < $1.createdAt }
+            scope == "all" || (scope == "inbox" && workspace.effectiveLabel(task) == nil)
+            || (scope == "today" && task.dueDate.map { Calendar.current.isDateInToday($0) } == true)
+            || workspace.labelPath(workspace.effectiveLabel(task)).contains { $0.id.uuidString == scope }
+        }
     }
+    var roots: [TaskItem] {
+        let filtered = scopedTasks.filter { task in
+            guard task.parentID == nil else { return false }
+            let matches = task.title.localizedCaseInsensitiveContains(search) || task.notes.localizedCaseInsensitiveContains(search) || workspace.descendants(of: task.id).contains { id in workspace.tasks.first { $0.id == id }?.title.localizedCaseInsensitiveContains(search) == true }
+            return (search.isEmpty || matches) && (board || showResolved || !task.status.isResolved)
+        }
+        return workspace.sortedTasks(filtered, byImportance: sortByImportance)
+    }
+    func highlightsTask(_ id: UUID) -> Bool { activeRegion == .tasks && selectedID == id }
     var title: String { switch scope { case "all": "All tasks"; case "inbox": "Inbox"; case "today": "Today"; default: workspace.labels.first { $0.id.uuidString == scope }?.name ?? "All tasks" } }
     func save(_ before: Workspace? = nil) {
         guard !loadFailed else { if let before { workspace = before }; message = "Saving is disabled because the existing data file could not be read. Restore a valid backup first."; return }
@@ -56,9 +71,22 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
             if let before { undoWorkspace = before }
         } catch { if let before { workspace = before }; message = "Could not save changes: \(error.localizedDescription)" }
     }
-    func add(_ title: String, parent: UUID? = nil, label: UUID? = nil) {
+    @discardableResult func add(_ title: String, parent: UUID? = nil, label: UUID? = nil, dismissSuggestion: Bool = false) -> UUID? {
         let before = workspace
-        if let id = workspace.addTask(title: title, parent: parent, label: label) { selectedID = id; save(before) }
+        guard let id = workspace.addTask(title: title, parent: parent, label: label) else { return nil }
+        if dismissSuggestion, let index = workspace.tasks.firstIndex(where: { $0.id == id }) { workspace.tasks[index].smartEntryDismissed = true }
+        if let parent { collapsedTasks.remove(parent) }
+        selectedID = id; save(before)
+        return workspace.tasks.contains(where: { $0.id == id }) ? id : nil
+    }
+    func openTask(_ id: UUID) { selectedID = id; inspectorID = id; activeRegion = .tasks }
+    func closeInspector() { inspectorID = nil }
+    func acceptSelectedSuggestion() {
+        guard let task = selected, let label = workspace.smartMatches(for: task).first else { return }
+        let before = workspace; workspace.acceptSmartMatch(task: task.id, label: label.id); save(before)
+    }
+    func acceptSuggestion(task: UUID, label: UUID) {
+        let before = workspace; workspace.acceptSmartMatch(task: task, label: label); save(before)
     }
     func edit(_ id: UUID, _ change: (inout TaskItem) -> Void) {
         guard let index = workspace.tasks.firstIndex(where: { $0.id == id }) else { return }
@@ -75,7 +103,7 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
     }
     func deleteSelected() {
         guard let id = selectedID else { return }; let before = workspace
-        workspace.delete(id); selectedID = nil; save(before)
+        let removed = Set([id] + workspace.descendants(of: id)); workspace.delete(id); selectedID = nil; if let inspectorID, removed.contains(inspectorID) { self.inspectorID = nil }; save(before)
     }
     func undo() { guard let previous = undoWorkspace else { return }; let current = workspace; workspace = previous; save(current) }
     func toggleProperty(_ key: WritableKeyPath<ViewProperties, Bool>) {
@@ -119,11 +147,12 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
                 let recoveryURL = fileURL.deletingLastPathComponent().appending(path: "workspace-unreadable-\(UUID().uuidString).json")
                 try FileManager.default.copyItem(at: fileURL, to: recoveryURL)
             }
-            loadFailed = false; let before = workspace; workspace = imported; selectedID = nil; save(before)
+            loadFailed = false; let before = workspace; workspace = imported; selectedID = nil; inspectorID = nil; save(before)
         } catch { message = "Could not restore backup: \(error.localizedDescription)" }
     }
     func openScope(_ scope: String) {
-        self.scope = scope; selectedID = nil; search = ""
+        activeRegion = .sidebar
+        self.scope = scope; selectedID = nil; inspectorID = nil; search = ""
         revealCurrentLabel()
     }
     func revealCurrentLabel() {
@@ -143,7 +172,9 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
         else if let parent = label.parentID { openScope(parent.uuidString) }
     }
     func selectNext(_ offset: Int) {
-        let items = roots
+        activeRegion = .tasks
+        inspectorID = nil
+        let items = viewMode == .board ? TaskStatus.allCases.flatMap { status in roots.filter { $0.status == status } } : taskRows.map(\.task)
         guard !items.isEmpty else { return }
         let index = items.firstIndex { $0.id == selectedID } ?? (offset > 0 ? -1 : items.count)
         selectedID = items[min(max(index + offset, 0), items.count - 1)].id

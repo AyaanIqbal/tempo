@@ -80,13 +80,13 @@ struct TaskWebView: View {
                     Text(node.status?.rawValue ?? branchSummary(node)).font(.system(size: 9)).foregroundStyle(node.status == .done ? .green : .secondary)
                 }.frame(maxWidth: .infinity, minHeight: 48, alignment: .leading).contentShape(Rectangle())
             }.buttonStyle(.plain)
-        }.padding(.horizontal, 11).frame(maxWidth: .infinity, maxHeight: .infinity).background(.background, in: RoundedRectangle(cornerRadius: 9)).overlay { RoundedRectangle(cornerRadius: 9).strokeBorder(store.selectedID == node.itemID && node.kind == .task ? Color.accent : color.opacity(0.2), lineWidth: 1) }
+        }.padding(.horizontal, 11).frame(maxWidth: .infinity, maxHeight: .infinity).background(.background, in: RoundedRectangle(cornerRadius: 9)).overlay { RoundedRectangle(cornerRadius: 9).strokeBorder(store.activeRegion == .tasks && store.selectedID == node.itemID && node.kind == .task ? Color.accent : color.opacity(0.2), lineWidth: 1) }
         .contextMenu { if node.kind == .task, let id = node.itemID { ForEach(TaskStatus.allCases, id: \.self) { status in Button(status.rawValue) { store.status(id, status) } } } }
         .accessibilityElement(children: .contain).accessibilityLabel("\(node.title), \(node.status?.rawValue ?? branchSummary(node))")
     }
     private func open(_ node: TaskGraphNode) {
         switch node.kind {
-        case .task: store.selectedID = node.itemID
+        case .task: if let id = node.itemID { store.openTask(id) }
         case .label: if let id = node.itemID { store.scope = id.uuidString }
         case .inbox: store.scope = "inbox"
         case .workspace: store.scope = "all"

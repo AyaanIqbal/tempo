@@ -122,3 +122,39 @@ func sidebarOrderAndBreadcrumbs() throws {
 }
 try sidebarOrderAndBreadcrumbs()
 print("Sidebar navigation and breadcrumb checks passed (9 groups total).")
+
+func rolledUpCountsAndVisibleSubtasks() throws {
+    var w = Workspace(); let work = try w.addLabel(name: "Work")
+    let ai = try w.addLabel(name: "AI Sec", parent: work); let edge = try w.addLabel(name: "Edge Sec", parent: work)
+    let a = w.addTask(title: "AI task", label: ai)!
+    let b = w.addTask(title: "Edge one", label: edge)!; _ = w.addTask(title: "Edge two", label: edge)
+    precondition(w.taskCount(in: ai) == 1 && w.taskCount(in: edge) == 2 && w.taskCount(in: work) == 3)
+    _ = w.addTask(title: "Work itself", label: work)
+    precondition(w.taskCount(in: work) == 4)
+    let child = w.addTask(title: "AI child", parent: a)!
+    precondition(w.taskCount(in: ai) == 2 && w.taskCount(in: work) == 5)
+    try w.setStatus(b, to: .done)
+    let roots = w.tasks.filter { $0.parentID == nil }
+    precondition(w.taskRows(roots: roots).contains { $0.id == b })
+    precondition(w.taskRows(roots: roots).first { $0.id == child }?.depth == 1)
+    precondition(!w.taskRows(roots: roots, collapsed: [a]).contains { $0.id == child })
+    precondition(!w.taskRows(roots: roots, showResolved: false).contains { $0.id == b })
+}
+func persistentSmartEntry() throws {
+    var w = Workspace(); let work = try w.addLabel(name: "Work"); let edge = try w.addLabel(name: "Edge Security", parent: work)
+    let task = w.addTask(title: "Edge Security WAF harvester")!
+    precondition(w.smartMatches(for: w.tasks[0]).first?.id == edge)
+    let saved = try JSONDecoder().decode(Workspace.self, from: JSONEncoder().encode(w))
+    precondition(saved.smartMatches(for: saved.tasks[0]).first?.id == edge)
+    w.acceptSmartMatch(task: task, label: edge)
+    precondition(w.tasks[0].title == "WAF harvester" && w.tasks[0].labelID == edge)
+    let dismissed = w.addTask(title: "Edge Security another task")!
+    let index = w.tasks.firstIndex { $0.id == dismissed }!; w.tasks[index].smartEntryDismissed = true
+    let restored = try JSONDecoder().decode(Workspace.self, from: JSONEncoder().encode(w))
+    precondition(restored.smartMatches(for: restored.tasks[index]).isEmpty)
+    let child = w.addTask(title: "Edge Security inherited labels", parent: task)!
+    precondition(w.smartMatches(for: w.tasks.first { $0.id == child }!).isEmpty)
+}
+try rolledUpCountsAndVisibleSubtasks()
+try persistentSmartEntry()
+print("Label count, nested/completed task, and persistent smart-entry checks passed (11 groups total).")

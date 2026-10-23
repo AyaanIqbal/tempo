@@ -30,7 +30,9 @@ jobs:
           fi
           echo "TEMPO_TAG=v$version" >> "$GITHUB_ENV"
       - name: Check model behavior
-        run: swift run TempoChecks
+        run: |
+          swift run TempoChecks
+          ./scripts/check-interactions.sh
       - name: Import optional Apple signing credentials
         env:
           CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
