@@ -100,3 +100,28 @@ public extension Workspace {
         return nodes
     }
 }
+
+public extension Workspace {
+    func viewCaption(for scope: String) -> String {
+        switch scope {
+        case "inbox": return "Unlabelled tasks, ready to find their place."
+        case "today": return "Focus on what's due today."
+        case "all": return "Make room for what matters."
+        default:
+            guard let label = labels.first(where: { $0.id.uuidString == scope }) else { return "Make room for what matters." }
+            let custom = label.caption?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return custom.isEmpty ? "Tasks and progress for \(label.name)." : custom
+        }
+    }
+}
+
+public extension Workspace {
+    func sidebarScopes(collapsed: Set<UUID> = []) -> [String] {
+        ["all", "inbox", "today"] + labelRows(collapsed: collapsed).map { $0.id.uuidString }
+    }
+    func adjacentScope(to current: String, offset: Int, collapsed: Set<UUID> = []) -> String {
+        let scopes = sidebarScopes(collapsed: collapsed)
+        guard let index = scopes.firstIndex(of: current) else { return scopes[0] }
+        return scopes[min(max(index + offset, 0), scopes.count - 1)]
+    }
+}

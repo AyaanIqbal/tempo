@@ -5,13 +5,20 @@ struct ContentView: View {
     @Bindable var store: Store
     @State private var draft = ""
     @State private var showDisplay = false
+    @State private var showCaptionEditor = false
     @State private var acceptedLabel: UUID?
     @State private var dismissedMatch = false
     @FocusState private var focus: Field?
+    @FocusState private var sidebarFocused: Bool
     enum Field { case composer, search }
     var body: some View {
         HSplitView {
             sidebar.frame(minWidth: 200, idealWidth: 220, maxWidth: 260)
+                .focusable().focusEffectDisabled().focused($sidebarFocused)
+                .onKeyPress(.downArrow) { guard sidebarFocused else { return .ignored }; store.navigateViews(1); return .handled }
+                .onKeyPress(.upArrow) { guard sidebarFocused else { return .ignored }; store.navigateViews(-1); return .handled }
+                .onKeyPress(.rightArrow) { guard sidebarFocused else { return .ignored }; store.navigateLabelBranch(expand: true); return .handled }
+                .onKeyPress(.leftArrow) { guard sidebarFocused else { return .ignored }; store.navigateLabelBranch(expand: false); return .handled }
             VStack(spacing: 0) {
                 header
                 ScrollView {
@@ -33,6 +40,8 @@ struct ContentView: View {
         .sheet(isPresented: $store.showHelp) { ShortcutsView() }
         .sheet(isPresented: Binding(get: { store.pendingCancel != nil }, set: { if !$0 { store.pendingCancel = nil } })) { CancelTaskView(store: store) }
         .alert("Tempo", isPresented: Binding(get: { store.message != nil }, set: { if !$0 { store.message = nil } })) { Button("OK") { store.message = nil } } message: { Text(store.message ?? "") }
+        .onChange(of: store.scope) { store.revealCurrentLabel() }
+        .onReceive(NotificationCenter.default.publisher(for: .focusSidebar)) { _ in sidebarFocused = true }
         .onChange(of: store.focusComposer) { focus = .composer }
         .onReceive(NotificationCenter.default.publisher(for: .searchTasks)) { _ in focus = .search }
     }
@@ -42,7 +51,7 @@ struct ContentView: View {
             nav("All tasks", symbol: "square.stack.3d.up", scope: "all", count: store.workspace.tasks.filter { $0.parentID == nil && !$0.status.isResolved }.count)
             nav("Inbox", symbol: "tray", scope: "inbox")
             nav("Today", symbol: "sun.max", scope: "today")
-            LabelExplorer(store: store, selection: Binding(get: { UUID(uuidString: store.scope) }, set: { id in if let id { store.scope = id.uuidString } })).padding(.top, 26)
+            LabelExplorer(store: store, selection: Binding(get: { UUID(uuidString: store.scope) }, set: { id in if let id { store.openScope(id.uuidString); sidebarFocused = true } })).padding(.top, 26)
             Spacer(minLength: 15)
             Divider().padding(.horizontal, 10)
             Button { store.showCommands = true } label: { HStack { Label("Command menu", systemImage: "command"); Spacer(); Text("⌘K").foregroundStyle(.tertiary) }.padding(12).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle()) }.buttonStyle(.plain).font(.system(size: 11))
@@ -50,17 +59,51 @@ struct ContentView: View {
         }.padding(.horizontal, 12).background(Color.accent.opacity(0.035))
     }
     private func nav(_ title: String, symbol: String, scope: String, count: Int? = nil) -> some View {
-        Button { store.scope = scope } label: { HStack(spacing: 11) { Image(systemName: symbol).frame(width: 16); Text(title); Spacer(); if let count { Text("\(count)").font(.system(size: 11)) } }.font(.system(size: 12, weight: store.scope == scope ? .semibold : .regular)).padding(11).foregroundStyle(store.scope == scope ? Color.accent : .secondary).frame(maxWidth: .infinity, minHeight: 36, alignment: .leading).background(store.scope == scope ? Color.accent.opacity(0.11) : .clear, in: RoundedRectangle(cornerRadius: 7)).contentShape(Rectangle()) }.buttonStyle(.plain)
+        Button { store.openScope(scope); sidebarFocused = true } label: { HStack(spacing: 11) { Image(systemName: symbol).frame(width: 16); Text(title); Spacer(); if let count { Text("\(count)").font(.system(size: 11)) } }.font(.system(size: 12, weight: store.scope == scope ? .semibold : .regular)).padding(11).foregroundStyle(store.scope == scope ? Color.accent : .secondary).frame(maxWidth: .infinity, minHeight: 36, alignment: .leading).background(store.scope == scope ? Color.accent.opacity(0.11) : .clear, in: RoundedRectangle(cornerRadius: 7)).contentShape(Rectangle()) }.buttonStyle(.plain)
     }
     private var header: some View {
-        HStack { Text("My workspace").foregroundStyle(.tertiary); Image(systemName: "chevron.right").font(.system(size: 8)); Text(store.title).foregroundStyle(.secondary); Spacer(); Image(systemName: "checkmark.icloud").foregroundStyle(Color.accent.opacity(0.6)); Text("On this Mac").foregroundStyle(.tertiary) }.font(.system(size: 11)).padding(.horizontal, 32).frame(height: 57).overlay(alignment: .bottom) { Divider().opacity(0.5) }
+        HStack(spacing: 12) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    Button("My workspace") { store.openScope("all") }.foregroundStyle(.tertiary)
+                    let path = store.workspace.labelPath(UUID(uuidString: store.scope))
+                    if path.isEmpty {
+                        Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(.tertiary)
+                        Text(store.title).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(path) { label in
+                            Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(.tertiary)
+                            Button(label.name) { store.openScope(label.id.uuidString) }.foregroundStyle(label.id.uuidString == store.scope ? Color.primary : .secondary)
+                        }
+                    }
+                }.buttonStyle(.plain).font(.system(size: 11)).fixedSize(horizontal: true, vertical: false)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "checkmark.icloud").foregroundStyle(Color.accent.opacity(0.6))
+            Text("On this Mac").foregroundStyle(.tertiary).fixedSize()
+        }.font(.system(size: 11)).padding(.horizontal, 32).frame(height: 57).overlay(alignment: .bottom) { Divider().opacity(0.5) }
     }
     private var introduction: some View {
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 8) { Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()).uppercased()).font(.system(size: 9, weight: .medium)).tracking(1.8).foregroundStyle(.tertiary); Text(store.title).font(.system(size: 30, weight: .semibold)); Text("Make room for what matters.").font(.system(size: 12)).foregroundStyle(.secondary) }
+            VStack(alignment: .leading, spacing: 8) { Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()).uppercased()).font(.system(size: 9, weight: .medium)).tracking(1.8).foregroundStyle(.tertiary); Text(store.title).font(.system(size: 30, weight: .semibold)); caption }
             Spacer()
             Button { focus = .composer } label: { Label("New task", systemImage: "plus").font(.system(size: 12, weight: .medium)).padding(.vertical, 4) }.buttonStyle(.borderedProminent).keyboardShortcut("n")
         }
+    }
+    private var caption: some View {
+        Group {
+            if let label = store.workspace.labels.first(where: { $0.id.uuidString == store.scope }) {
+                Button { showCaptionEditor = true } label: {
+                    HStack(spacing: 6) {
+                        Text(store.workspace.viewCaption(for: store.scope)).fixedSize(horizontal: false, vertical: true)
+                        Image(systemName: "pencil").font(.system(size: 9)).foregroundStyle(.tertiary)
+                    }.font(.system(size: 12)).foregroundStyle(.secondary).padding(.vertical, 3).contentShape(Rectangle())
+                }.buttonStyle(.plain).help("Customize this label's caption")
+                .popover(isPresented: $showCaptionEditor) { LabelCaptionEditor(store: store, labelID: label.id).id(label.id) }
+            } else {
+                Text(store.workspace.viewCaption(for: store.scope)).font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+        }.onChange(of: store.scope) { showCaptionEditor = false }
     }
     private var summary: some View {
         HStack(spacing: 12) {

@@ -31,6 +31,7 @@ import TempoCore
             }
             CommandMenu("Navigate") {
                 Button("Command Menu…") { store.showCommands = true }.keyboardShortcut("k")
+                Button("Focus Sidebar") { NotificationCenter.default.post(name: .focusSidebar, object: nil) }.keyboardShortcut("s", modifiers: [.control, .command])
                 Button("Search Tasks") { NotificationCenter.default.post(name: .searchTasks, object: nil) }.keyboardShortcut("f")
                 Button("Next Task") { store.selectNext(1) }.keyboardShortcut(.downArrow, modifiers: .option)
                 Button("Previous Task") { store.selectNext(-1) }.keyboardShortcut(.upArrow, modifiers: .option)
@@ -50,6 +51,7 @@ import TempoCore
 }
 extension Notification.Name {
     static let newSubtask = Notification.Name("tempo.newSubtask")
+    static let focusSidebar = Notification.Name("tempo.focusSidebar")
     static let searchTasks = Notification.Name("tempo.search")
 }
 extension Color {

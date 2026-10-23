@@ -86,3 +86,39 @@ func graphRelationshipsAndCompletion() throws {
 try labelTreeEditing()
 try graphRelationshipsAndCompletion()
 print("Passed label editing/tree and graph relationship/completion checks (7 groups total).")
+
+func captionsAndLegacyLabels() throws {
+    var workspace = Workspace()
+    precondition(workspace.viewCaption(for: "all") == "Make room for what matters.")
+    precondition(workspace.viewCaption(for: "inbox").contains("Unlabelled"))
+    precondition(workspace.viewCaption(for: "today").contains("today"))
+    let school = try workspace.addLabel(name: "School")
+    let work = try workspace.addLabel(name: "Work")
+    workspace.labels[0].caption = "One course at a time."
+    precondition(workspace.viewCaption(for: school.uuidString) == "One course at a time.")
+    precondition(workspace.viewCaption(for: work.uuidString) == "Tasks and progress for Work.")
+    let restored = try JSONDecoder().decode(Workspace.self, from: JSONEncoder().encode(workspace))
+    precondition(restored.viewCaption(for: school.uuidString) == "One course at a time.")
+    let legacyData = Data("{\"id\":\"\(UUID().uuidString)\",\"name\":\"Legacy\"}".utf8)
+    let legacy = try JSONDecoder().decode(TaskLabel.self, from: legacyData)
+    precondition(legacy.caption == nil)
+    workspace.labels[0].caption = "  "
+    precondition(workspace.viewCaption(for: school.uuidString) == "Tasks and progress for School.")
+}
+try captionsAndLegacyLabels()
+print("Caption persistence, defaults, and legacy compatibility checks passed (8 groups total).")
+
+func sidebarOrderAndBreadcrumbs() throws {
+    var workspace = Workspace()
+    let work = try workspace.addLabel(name: "Work")
+    let school = try workspace.addLabel(name: "School")
+    let ai = try workspace.addLabel(name: "AI Sec", parent: work)
+    let nested = try workspace.addLabel(name: "Research", parent: ai)
+    precondition(workspace.sidebarScopes() == ["all", "inbox", "today", work.uuidString, ai.uuidString, nested.uuidString, school.uuidString])
+    precondition(workspace.adjacentScope(to: work.uuidString, offset: 1) == ai.uuidString)
+    precondition(workspace.adjacentScope(to: work.uuidString, offset: 1, collapsed: [work]) == school.uuidString)
+    precondition(workspace.adjacentScope(to: "all", offset: -1) == "all")
+    precondition(workspace.labelPath(nested).map(\.name) == ["Work", "AI Sec", "Research"])
+}
+try sidebarOrderAndBreadcrumbs()
+print("Sidebar navigation and breadcrumb checks passed (9 groups total).")

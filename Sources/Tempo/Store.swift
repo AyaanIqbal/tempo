@@ -9,6 +9,7 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
     var workspace = Workspace()
     var selectedID: UUID?
     var scope = "all"
+    var collapsedLabels: Set<UUID> = []
     var viewMode: WorkspaceView = .list
     var board: Bool {
         get { viewMode == .board }
@@ -92,6 +93,13 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
         do { try workspace.updateLabel(id, name: name, parent: parent); save(before) }
         catch { message = error.localizedDescription }
     }
+    func setLabelCaption(_ id: UUID, caption: String) {
+        guard let index = workspace.labels.firstIndex(where: { $0.id == id }) else { return }
+        let before = workspace
+        let caption = caption.trimmingCharacters(in: .whitespacesAndNewlines)
+        workspace.labels[index].caption = caption.isEmpty ? nil : caption
+        save(before)
+    }
     func removeLabel(_ id: UUID) {
         let before = workspace; workspace.removeLabel(id); if scope == id.uuidString { scope = "all" }; save(before)
     }
@@ -113,6 +121,26 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
             }
             loadFailed = false; let before = workspace; workspace = imported; selectedID = nil; save(before)
         } catch { message = "Could not restore backup: \(error.localizedDescription)" }
+    }
+    func openScope(_ scope: String) {
+        self.scope = scope; selectedID = nil; search = ""
+        revealCurrentLabel()
+    }
+    func revealCurrentLabel() {
+        guard let id = UUID(uuidString: scope) else { return }
+        for label in workspace.labelPath(id).dropLast() { collapsedLabels.remove(label.id) }
+    }
+    func navigateViews(_ offset: Int) {
+        openScope(workspace.adjacentScope(to: scope, offset: offset, collapsed: collapsedLabels))
+    }
+    func navigateLabelBranch(expand: Bool) {
+        guard let id = UUID(uuidString: scope), let label = workspace.labels.first(where: { $0.id == id }) else { return }
+        let child = workspace.labels.first { $0.parentID == id }
+        if expand {
+            if collapsedLabels.contains(id) { collapsedLabels.remove(id) }
+            else if let child { openScope(child.id.uuidString) }
+        } else if child != nil && !collapsedLabels.contains(id) { collapsedLabels.insert(id) }
+        else if let parent = label.parentID { openScope(parent.uuidString) }
     }
     func selectNext(_ offset: Int) {
         let items = roots

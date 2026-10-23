@@ -54,3 +54,11 @@ The checks use a standalone executable so they also run with Apple Command Line 
 ## Downloads and updates
 
 See [Releasing Tempo](docs/RELEASING.md) for versioning, signed update packaging, GitHub Actions releases, and optional Apple notarization. The release workflow creates a draft for review; publishing it makes the stable download and update feed point to that release. Initial setup and a real two-version update test are required before calling distribution complete.
+
+## Navigating your workspace
+
+Click a sidebar view and use Up/Down to move through All tasks, Inbox, Today, and visible labels. Left collapses a branch or moves to its parent; Right expands it or enters its first child. Use Control-Command-S to focus the sidebar from the keyboard. Editing text keeps normal arrow-key behavior.
+
+Command-K searches label paths and tasks as well as commands. Select a label result to open its view (collapsed ancestors expand automatically), or a task result to open its details. Breadcrumbs show the complete workspace/label/sub-label path, with clickable parents.
+
+All tasks keeps its original caption. Inbox and Today have their own descriptions. Click the caption or pencil on any label view to customize it; Use default resets it. Captions are stored with labels, included in backups, and old data without captions still loads.

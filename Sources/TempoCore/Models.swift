@@ -25,6 +25,7 @@ public struct TaskItem: Codable, Identifiable, Equatable, Sendable {
 public struct TaskLabel: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var name: String
+    public var caption: String?
     public var parentID: UUID?
     public init(name: String, parentID: UUID? = nil) { self.name = name; self.parentID = parentID }
 }

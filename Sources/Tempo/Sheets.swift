@@ -23,9 +23,9 @@ struct CommandMenuView: View {
     private var actions: [(String, String, () -> Void)] {
         var items: [(String, String, () -> Void)] = [
             ("New task", "⌘N", { store.focusComposer = UUID() }),
-            ("All tasks", "", { store.scope = "all" }),
-            ("Inbox", "", { store.scope = "inbox" }),
-            ("Today", "", { store.scope = "today" }),
+            ("All tasks", "", { store.openScope("all") }),
+            ("Inbox", "", { store.openScope("inbox") }),
+            ("Today", "", { store.openScope("today") }),
             ("List view", "⌘1", { store.viewMode = .list }),
             ("Board view", "⌘2", { store.viewMode = .board }),
             ("Web view", "⌘3", { store.viewMode = .web }),
@@ -33,12 +33,29 @@ struct CommandMenuView: View {
             ("Restore backup", "", { store.importBackup() }),
             ("Keyboard shortcuts", "⌘/", { store.showHelp = true })
         ]
+        items += store.workspace.labelRows().map { row in
+            let path = store.workspace.labelPath(row.id).map(\.name).joined(separator: " / ")
+            return ("Open label: \(path)", "", { store.openScope(row.id.uuidString); NotificationCenter.default.post(name: .focusSidebar, object: nil) })
+        }
+        if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
+            let matches = store.workspace.tasks.filter { task in
+                let path = store.workspace.labelPath(store.workspace.effectiveLabel(task)).map(\.name).joined(separator: " / ")
+                return terms.allSatisfy { "\(path) \(task.title)".localizedCaseInsensitiveContains($0) }
+            }.prefix(20)
+            items += matches.map { task in
+                let path = store.workspace.labelPath(store.workspace.effectiveLabel(task)).map(\.name).joined(separator: " / ")
+                let title = path.isEmpty ? "Task: \(task.title)" : "Task: \(path) / \(task.title)"
+                return (title, "", { store.openScope(store.workspace.effectiveLabel(task)?.uuidString ?? "inbox"); store.selectedID = task.id })
+            }
+        }
         if let id = store.selectedID {
             items += [("Complete / reopen task", "⌘↵", { store.toggle(id) }), ("Delete task", "⌘⌫", { store.deleteSelected() })]
             items += TaskStatus.allCases.map { status in ("Set status: \(status.rawValue)", "", { store.status(id, status) }) }
             items += Importance.allCases.map { priority in ("Set importance: \(priority.title)", "⌥⌘\(priority.rawValue)", { store.edit(id) { $0.importance = priority } }) }
         }
-        return items.filter { query.isEmpty || $0.0.localizedCaseInsensitiveContains(query) }
+        let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        return items.filter { item in terms.allSatisfy { item.0.localizedCaseInsensitiveContains($0) } }
     }
     var body: some View {
         VStack(spacing: 0) {
@@ -86,7 +103,7 @@ struct CommandMenuView: View {
     private func run(_ action: @escaping () -> Void) { dismiss(); Task { @MainActor in try? await Task.sleep(for: .milliseconds(200)); action() } }
 }
 struct ShortcutsView: View {
-    let shortcuts = [("New task", "⌘N"), ("New subtask", "⇧⌘N"), ("Command menu", "⌘K"), ("Search tasks", "⌘F"), ("Complete / reopen", "⌘↵"), ("Next / previous task", "⌥↓ / ⌥↑"), ("List / board / web view", "⌘1 / ⌘2 / ⌘3"), ("Navigate command menu", "↑ / ↓ / ↵"), ("Importance: None → Urgent", "⌥⌘0 … ⌥⌘4"), ("Delete task and subtasks", "⌘⌫"), ("Undo last change", "⌘Z")]
+    let shortcuts = [("New task", "⌘N"), ("New subtask", "⇧⌘N"), ("Command menu", "⌘K"), ("Search tasks", "⌘F"), ("Complete / reopen", "⌘↵"), ("Next / previous task", "⌥↓ / ⌥↑"), ("List / board / web view", "⌘1 / ⌘2 / ⌘3"), ("Navigate command menu", "↑ / ↓ / ↵"), ("Focus sidebar", "⌃⌘S"), ("Sidebar views / branches", "↑ ↓ / ← →"), ("Importance: None → Urgent", "⌥⌘0 … ⌥⌘4"), ("Delete task and subtasks", "⌘⌫"), ("Undo last change", "⌘Z")]
 
     @Environment(\.dismiss) private var dismiss
     var body: some View { VStack(alignment: .leading, spacing: 16) { HStack { Text("Keep your hands on the keys").font(.system(size: 20, weight: .semibold)); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }; ForEach(shortcuts, id: \.0) { name, keys in HStack { Text(name); Spacer(); Text(keys).foregroundStyle(.secondary).monospaced() }.font(.system(size: 12)); Divider() } }.padding(28).frame(width: 470) }

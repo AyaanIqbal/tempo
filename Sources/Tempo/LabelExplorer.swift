@@ -5,7 +5,6 @@ import TempoCore
 struct LabelExplorer: View {
     @Bindable var store: Store
     @Binding var selection: UUID?
-    @State private var collapsed: Set<UUID> = []
     @State private var adding = false
     @State private var renaming: UUID?
     @State private var removing: UUID?
@@ -19,15 +18,18 @@ struct LabelExplorer: View {
                 Spacer()
                 Button { beginAdding(parent: nil) } label: { Image(systemName: "plus").frame(width: 26, height: 26).contentShape(Rectangle()) }.help("New top-level label")
             }.buttonStyle(.plain).foregroundStyle(.secondary).padding(.leading, 12).padding(.trailing, 3)
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     if adding && draftParent == nil { editor(depth: 0) }
                     if store.workspace.labels.isEmpty && !adding { Text("No labels yet.\nUse + to create your first one.").font(.system(size: 11)).foregroundStyle(.tertiary).lineSpacing(5).padding(12) }
-                    ForEach(store.workspace.labelRows(collapsed: collapsed)) { row in
-                        if renaming == row.id { editor(depth: row.depth) } else { labelRow(row) }
+                    ForEach(store.workspace.labelRows(collapsed: store.collapsedLabels)) { row in
+                        if renaming == row.id { editor(depth: row.depth) } else { labelRow(row).id(row.id) }
                         if adding && draftParent == row.id { editor(depth: row.depth + 1) }
                     }
                 }.padding(.vertical, 4)
+            }
+            .onChange(of: selection) { if let selection { withAnimation(.easeOut(duration: 0.1)) { proxy.scrollTo(selection) } } }
             }
         }
         .confirmationDialog("Remove label?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
@@ -38,8 +40,8 @@ struct LabelExplorer: View {
         let hasChildren = store.workspace.labels.contains { $0.parentID == row.id }
         return HStack(spacing: 0) {
             Button {
-                if collapsed.contains(row.id) { collapsed.remove(row.id) } else { collapsed.insert(row.id) }
-            } label: { Image(systemName: collapsed.contains(row.id) ? "chevron.right" : "chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary).frame(width: 20, height: 32).contentShape(Rectangle()) }.buttonStyle(.plain).disabled(!hasChildren).opacity(hasChildren ? 1 : 0)
+                if store.collapsedLabels.contains(row.id) { store.collapsedLabels.remove(row.id) } else { store.collapsedLabels.insert(row.id) }
+            } label: { Image(systemName: store.collapsedLabels.contains(row.id) ? "chevron.right" : "chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary).frame(width: 20, height: 32).contentShape(Rectangle()) }.buttonStyle(.plain).disabled(!hasChildren).opacity(hasChildren ? 1 : 0)
             Button { selection = row.id } label: {
                 HStack(spacing: 8) { Circle().fill(Color.accent.opacity(0.65)).frame(width: 6, height: 6); Text(row.label.name).lineLimit(1); Spacer(minLength: 0) }.font(.system(size: 12)).frame(maxWidth: .infinity, minHeight: 34, alignment: .leading).contentShape(Rectangle())
             }.buttonStyle(.plain)
@@ -73,7 +75,7 @@ struct LabelExplorer: View {
     }
     private func beginAdding(parent: UUID?) {
         renaming = nil; draftParent = parent; draft = ""; adding = true
-        if let parent { collapsed.remove(parent) }
+        if let parent { store.collapsedLabels.remove(parent) }
         editing = true
     }
     private func create() {
