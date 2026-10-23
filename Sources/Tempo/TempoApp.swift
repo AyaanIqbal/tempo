@@ -17,7 +17,6 @@ import TempoCore
             CommandGroup(replacing: .newItem) {
                 Button("New Task") { store.focusComposer = UUID() }.keyboardShortcut("n")
                 Button("New Subtask") { if store.selectedID != nil { NotificationCenter.default.post(name: .newSubtask, object: nil) } }.keyboardShortcut("n", modifiers: [.command, .shift]).disabled(store.selectedID == nil)
-                Button("Manage Labels…") { store.showLabels = true }.keyboardShortcut("l", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .undoRedo) { Button("Undo Last Change") { store.undo() }.keyboardShortcut("z").disabled(store.undoWorkspace == nil) }
             CommandMenu("Task") {
@@ -36,6 +35,7 @@ import TempoCore
                 Divider()
                 Button("List View") { store.board = false }.keyboardShortcut("1")
                 Button("Board View") { store.board = true }.keyboardShortcut("2")
+                Button("Web View") { store.viewMode = .web }.keyboardShortcut("3")
             }
             CommandGroup(after: .importExport) {
                 Button("Export Backup…") { store.exportBackup() }
@@ -43,6 +43,7 @@ import TempoCore
             }
             CommandGroup(replacing: .help) { Button("Tempo Keyboard Shortcuts") { store.showHelp = true }.keyboardShortcut("/", modifiers: .command) }
         }
+
     }
 }
 extension Notification.Name {

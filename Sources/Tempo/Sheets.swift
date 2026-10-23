@@ -1,31 +1,6 @@
 import SwiftUI
 import TempoCore
 
-struct LabelManager: View {
-    @Bindable var store: Store
-    @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var parent: UUID?
-    @State private var validation = ""
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack { Text("A place for everything").font(.system(size: 22, weight: .semibold)); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }
-            Text("Add as much structure as you need. Labels can contain labels, at any depth.").font(.system(size: 12)).foregroundStyle(.secondary)
-            ScrollView { VStack(alignment: .leading, spacing: 10) { if store.workspace.labels.isEmpty { Text("No labels yet. Your tasks work just fine without them.").foregroundStyle(.tertiary).padding(.vertical, 25) }; ForEach(store.workspace.labels) { label in HStack { Image(systemName: "tag").foregroundStyle(Color.accent); Text(store.workspace.labelPath(label.id).map(\.name).joined(separator: " / ")); Spacer() }.font(.system(size: 12)).padding(9).background(Color.accent.opacity(0.04), in: RoundedRectangle(cornerRadius: 6)) } } }.frame(minHeight: 100, maxHeight: 230)
-            Divider()
-            TextField("Label name, e.g. Edge Security", text: $name).textFieldStyle(.roundedBorder).onSubmit(add)
-            Picker("Inside", selection: $parent) { Text("No parent — top-level label").tag(nil as UUID?); ForEach(store.workspace.labels) { label in Text(store.workspace.labelPath(label.id).map(\.name).joined(separator: " / ")).tag(Optional(label.id)) } }
-            if !validation.isEmpty { Text(validation).foregroundStyle(.red).font(.system(size: 11)) }
-            HStack { Text("Work → Edge Security → Backend").font(.system(size: 10)).foregroundStyle(.tertiary); Spacer(); Button("Add label", action: add).buttonStyle(.borderedProminent).disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
-        }.padding(28).frame(width: 510)
-    }
-    private func add() {
-        let value = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty else { return }
-        guard !store.workspace.labels.contains(where: { $0.parentID == parent && $0.name.caseInsensitiveCompare(value) == .orderedSame }) else { validation = "A label with this name already exists here."; return }
-        let before = store.workspace; store.workspace.labels.append(TaskLabel(name: value, parentID: parent)); store.save(before); name = ""; validation = ""
-    }
-}
 struct CancelTaskView: View {
     @Bindable var store: Store
     @State private var reason = ""
@@ -43,6 +18,7 @@ struct CommandMenuView: View {
     @Bindable var store: Store
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var selectedIndex = 0
     @FocusState private var focused: Bool
     private var actions: [(String, String, () -> Void)] {
         var items: [(String, String, () -> Void)] = [
@@ -50,9 +26,9 @@ struct CommandMenuView: View {
             ("All tasks", "", { store.scope = "all" }),
             ("Inbox", "", { store.scope = "inbox" }),
             ("Today", "", { store.scope = "today" }),
-            ("List view", "⌘1", { store.board = false }),
-            ("Board view", "⌘2", { store.board = true }),
-            ("Manage labels", "⇧⌘L", { store.showLabels = true }),
+            ("List view", "⌘1", { store.viewMode = .list }),
+            ("Board view", "⌘2", { store.viewMode = .board }),
+            ("Web view", "⌘3", { store.viewMode = .web }),
             ("Export backup", "", { store.exportBackup() }),
             ("Restore backup", "", { store.importBackup() }),
             ("Keyboard shortcuts", "⌘/", { store.showHelp = true })
@@ -66,15 +42,52 @@ struct CommandMenuView: View {
     }
     var body: some View {
         VStack(spacing: 0) {
-            HStack { Image(systemName: "magnifyingglass").foregroundStyle(.secondary); TextField("What would you like to do?", text: $query).textFieldStyle(.plain).focused($focused).onSubmit { if let action = actions.first?.2 { run(action) } }; Button("Esc") { dismiss() }.font(.system(size: 10)).buttonStyle(.plain).foregroundStyle(.tertiary) }.padding(20)
+            HStack {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("What would you like to do?", text: $query)
+                    .textFieldStyle(.plain).focused($focused)
+                    .onSubmit { activateSelected() }
+                    .onKeyPress(.downArrow) { move(1); return .handled }
+                    .onKeyPress(.upArrow) { move(-1); return .handled }
+                    .onKeyPress(.escape) { dismiss(); return .handled }
+                Button("Esc") { dismiss() }.font(.system(size: 10)).buttonStyle(.plain).foregroundStyle(.tertiary)
+            }.padding(20)
             Divider()
-            ScrollView { VStack(spacing: 2) { ForEach(Array(actions.enumerated()), id: \.offset) { _, item in Button { run(item.2) } label: { HStack { Text(item.0); Spacer(); Text(item.1).foregroundStyle(.tertiary) }.font(.system(size: 12)).padding(12).contentShape(Rectangle()) }.buttonStyle(.plain) }; if actions.isEmpty { Text("No matching commands").foregroundStyle(.secondary).padding(30) } }.padding(8) }.frame(height: 340)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(Array(actions.enumerated()), id: \.offset) { index, item in
+                            Button { run(item.2) } label: {
+                                HStack { Text(item.0); Spacer(); if selectedIndex == index { Image(systemName: "return").font(.system(size: 10)).foregroundStyle(Color.accent) }; Text(item.1).foregroundStyle(.tertiary) }
+                                    .font(.system(size: 12)).padding(12)
+                                    .frame(maxWidth: .infinity, minHeight: 39, alignment: .leading)
+                                    .background(selectedIndex == index ? Color.accent.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                                    .contentShape(Rectangle())
+                            }.buttonStyle(.plain).id(index)
+                            .accessibilityAddTraits(selectedIndex == index ? .isSelected : [])
+                        }
+                        if actions.isEmpty { Text("No matching commands").foregroundStyle(.secondary).padding(30) }
+                    }.padding(8)
+                }.frame(height: 340)
+                .onChange(of: selectedIndex) { withAnimation(.easeOut(duration: 0.1)) { proxy.scrollTo(selectedIndex, anchor: .center) } }
+                .onChange(of: query) { selectedIndex = 0; proxy.scrollTo(0, anchor: .top) }
+            }
+            Divider()
+            HStack { Text("↑ ↓ to navigate"); Spacer(); Text("↵ to select · esc to close") }.font(.system(size: 10)).foregroundStyle(.tertiary).padding(.horizontal, 20).padding(.vertical, 10)
         }.frame(width: 480).onAppear { focused = true }
+    }
+    private func move(_ offset: Int) {
+        guard !actions.isEmpty else { selectedIndex = 0; return }
+        selectedIndex = (selectedIndex + offset + actions.count) % actions.count
+    }
+    private func activateSelected() {
+        guard actions.indices.contains(selectedIndex) else { return }; run(actions[selectedIndex].2)
     }
     private func run(_ action: @escaping () -> Void) { dismiss(); Task { @MainActor in try? await Task.sleep(for: .milliseconds(200)); action() } }
 }
 struct ShortcutsView: View {
+    let shortcuts = [("New task", "⌘N"), ("New subtask", "⇧⌘N"), ("Command menu", "⌘K"), ("Search tasks", "⌘F"), ("Complete / reopen", "⌘↵"), ("Next / previous task", "⌥↓ / ⌥↑"), ("List / board / web view", "⌘1 / ⌘2 / ⌘3"), ("Navigate command menu", "↑ / ↓ / ↵"), ("Importance: None → Urgent", "⌥⌘0 … ⌥⌘4"), ("Delete task and subtasks", "⌘⌫"), ("Undo last change", "⌘Z")]
+
     @Environment(\.dismiss) private var dismiss
-    let shortcuts = [("New task", "⌘N"), ("New subtask", "⇧⌘N"), ("Command menu", "⌘K"), ("Search tasks", "⌘F"), ("Complete / reopen", "⌘↵"), ("Next / previous task", "⌥↓ / ⌥↑"), ("List / board view", "⌘1 / ⌘2"), ("Importance: None → Urgent", "⌥⌘0 … ⌥⌘4"), ("Manage labels", "⇧⌘L"), ("Delete task and subtasks", "⌘⌫"), ("Undo last change", "⌘Z")]
     var body: some View { VStack(alignment: .leading, spacing: 16) { HStack { Text("Keep your hands on the keys").font(.system(size: 20, weight: .semibold)); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }; ForEach(shortcuts, id: \.0) { name, keys in HStack { Text(name); Spacer(); Text(keys).foregroundStyle(.secondary).monospaced() }.font(.system(size: 12)); Divider() } }.padding(28).frame(width: 470) }
 }

@@ -3,16 +3,21 @@ import AppKit
 import UniformTypeIdentifiers
 import TempoCore
 
+enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", web = "Web" }
+
 @MainActor @Observable final class Store {
     var workspace = Workspace()
     var selectedID: UUID?
     var scope = "all"
-    var board = false
+    var viewMode: WorkspaceView = .list
+    var board: Bool {
+        get { viewMode == .board }
+        set { viewMode = newValue ? .board : .list }
+    }
     var search = ""
     var showResolved = false
     var sortByImportance = false
     var showCommands = false
-    var showLabels = false
     var showHelp = false
     var pendingCancel: UUID?
     var focusComposer = UUID()
@@ -76,6 +81,19 @@ import TempoCore
         let before = workspace
         if board { workspace.boardProperties[keyPath: key].toggle() } else { workspace.listProperties[keyPath: key].toggle() }
         save(before)
+    }
+    @discardableResult func addLabel(_ name: String, parent: UUID?) -> UUID? {
+        let before = workspace
+        do { let id = try workspace.addLabel(name: name, parent: parent); save(before); return workspace.labels.contains(where: { $0.id == id }) ? id : nil }
+        catch { message = error.localizedDescription; return nil }
+    }
+    func updateLabel(_ id: UUID, name: String, parent: UUID?) {
+        let before = workspace
+        do { try workspace.updateLabel(id, name: name, parent: parent); save(before) }
+        catch { message = error.localizedDescription }
+    }
+    func removeLabel(_ id: UUID) {
+        let before = workspace; workspace.removeLabel(id); if scope == id.uuidString { scope = "all" }; save(before)
     }
     func exportBackup() {
         let panel = NSSavePanel(); panel.allowedContentTypes = [.json]; panel.nameFieldStringValue = "Tempo-backup.json"

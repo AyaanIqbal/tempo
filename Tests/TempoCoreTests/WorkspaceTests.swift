@@ -47,3 +47,42 @@ try cancellationRequiresReasonAndCascades()
 labelsAndSmartMatching()
 try deleteAndBackupValidation()
 print("Passed all 5 Tempo model checks.")
+
+func labelTreeEditing() throws {
+    var w = Workspace()
+    let work = try w.addLabel(name: "Work")
+    let school = try w.addLabel(name: "School")
+    let edge = try w.addLabel(name: "Edge Security", parent: work)
+    let backend = try w.addLabel(name: "Backend", parent: edge)
+    precondition(w.labelRows().map(\.id) == [work, edge, backend, school])
+    precondition(w.labelRows(collapsed: [work]).map(\.id) == [work, school])
+    do { try w.updateLabel(work, name: "Work", parent: backend); preconditionFailure("Allowed a label cycle") } catch LabelError.invalidParent {}
+    do { _ = try w.addLabel(name: " work "); preconditionFailure("Allowed a duplicate sibling") } catch LabelError.duplicateName {}
+    try w.updateLabel(edge, name: "Security", parent: school)
+    precondition(w.labelPath(backend).map(\.name) == ["School", "Security", "Backend"])
+    let task = w.addTask(title: "WAF", label: edge)!
+    w.removeLabel(edge)
+    precondition(w.tasks.first { $0.id == task }?.labelID == school)
+    precondition(w.labelPath(backend).map(\.name) == ["School", "Backend"])
+    try w.validate()
+}
+func graphRelationshipsAndCompletion() throws {
+    var w = Workspace(); let work = try w.addLabel(name: "Work"); let edge = try w.addLabel(name: "Edge Security", parent: work)
+    let parent = w.addTask(title: "WAF", label: edge)!; let child = w.addTask(title: "Harvester", parent: parent)!
+    try w.setStatus(child, to: .done)
+    let inbox = w.addTask(title: "Unlabeled task")!
+    var graph = w.taskGraph()
+    precondition(graph.first { $0.itemID == child }?.parent == "task-\(parent)")
+    precondition(graph.first { $0.itemID == child }?.status == .done)
+    precondition(graph.first { $0.itemID == parent }?.parent == "label-\(edge)")
+    precondition(graph.first { $0.itemID == edge }?.parent == "label-\(work)")
+    precondition(graph.first { $0.itemID == inbox }?.parent == "inbox")
+    graph = w.taskGraph(scope: edge.uuidString, query: "Harvester")
+    precondition(graph.contains { $0.itemID == parent })
+    precondition(!graph.contains { $0.itemID == inbox })
+    precondition(graph.allSatisfy { node in node.parent == nil || graph.contains { $0.id == node.parent } })
+    precondition(!w.taskGraph(includeResolved: false).contains { $0.itemID == child })
+}
+try labelTreeEditing()
+try graphRelationshipsAndCompletion()
+print("Passed label editing/tree and graph relationship/completion checks (7 groups total).")

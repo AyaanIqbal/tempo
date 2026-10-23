@@ -4,6 +4,7 @@ import TempoCore
 struct ContentView: View {
     @Bindable var store: Store
     @State private var draft = ""
+    @State private var showDisplay = false
     @State private var acceptedLabel: UUID?
     @State private var dismissedMatch = false
     @FocusState private var focus: Field?
@@ -19,7 +20,7 @@ struct ContentView: View {
                         summary
                         toolbar
                         composer
-                        if store.board { board } else { taskList }
+                        if store.viewMode == .web { TaskWebView(store: store) } else if store.board { board } else { taskList }
                         HStack { Spacer(); Text("A little structure. A little more headspace.").font(.system(size: 11)).foregroundStyle(.tertiary); Spacer() }.padding(.top, 10)
                     }.padding(32).frame(maxWidth: 1080).frame(maxWidth: .infinity)
                 }
@@ -28,7 +29,6 @@ struct ContentView: View {
                 TaskInspector(store: store, taskID: task.id).id(task.id).frame(minWidth: 300, idealWidth: 330, maxWidth: 400)
             }
         }
-        .sheet(isPresented: $store.showLabels) { LabelManager(store: store) }
         .sheet(isPresented: $store.showCommands) { CommandMenuView(store: store) }
         .sheet(isPresented: $store.showHelp) { ShortcutsView() }
         .sheet(isPresented: Binding(get: { store.pendingCancel != nil }, set: { if !$0 { store.pendingCancel = nil } })) { CancelTaskView(store: store) }
@@ -42,25 +42,15 @@ struct ContentView: View {
             nav("All tasks", symbol: "square.stack.3d.up", scope: "all", count: store.workspace.tasks.filter { $0.parentID == nil && !$0.status.isResolved }.count)
             nav("Inbox", symbol: "tray", scope: "inbox")
             nav("Today", symbol: "sun.max", scope: "today")
-            HStack { Text("LABELS").font(.system(size: 10, weight: .semibold)).tracking(1.7); Spacer(); Button { store.showLabels = true } label: { Image(systemName: "plus") }.buttonStyle(.plain).help("Manage labels") }.foregroundStyle(.tertiary).padding(.horizontal, 12).padding(.top, 30).padding(.bottom, 7)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 3) {
-                    if store.workspace.labels.isEmpty { Text("Start simple. Add labels\nwhenever you need them.").font(.system(size: 11)).foregroundStyle(.tertiary).lineSpacing(5).padding(12) }
-                    ForEach(store.workspace.labels) { label in
-                        Button { store.scope = label.id.uuidString } label: {
-                            HStack(spacing: 9) { Circle().fill(Color.accent.opacity(0.65)).frame(width: 6, height: 6); Text(label.name).lineLimit(1); Spacer() }.font(.system(size: 12)).padding(.vertical, 8).padding(.leading, 12 + CGFloat(store.workspace.labelPath(label.id).count - 1) * 12).padding(.trailing, 10).background(store.scope == label.id.uuidString ? Color.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 7))
-                        }.buttonStyle(.plain).help(store.workspace.labelPath(label.id).map(\.name).joined(separator: " / "))
-                    }
-                }
-            }
+            LabelExplorer(store: store, selection: Binding(get: { UUID(uuidString: store.scope) }, set: { id in if let id { store.scope = id.uuidString } })).padding(.top, 26)
             Spacer(minLength: 15)
             Divider().padding(.horizontal, 10)
-            Button { store.showCommands = true } label: { HStack { Label("Command menu", systemImage: "command"); Spacer(); Text("⌘K").foregroundStyle(.tertiary) } }.buttonStyle(.plain).font(.system(size: 11)).padding(12)
+            Button { store.showCommands = true } label: { HStack { Label("Command menu", systemImage: "command"); Spacer(); Text("⌘K").foregroundStyle(.tertiary) }.padding(12).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle()) }.buttonStyle(.plain).font(.system(size: 11))
             Menu { Button("Export backup…") { store.exportBackup() }; Button("Restore backup…") { store.importBackup() }; Button("Keyboard shortcuts") { store.showHelp = true } } label: { Label("Local workspace", systemImage: "internaldrive").font(.system(size: 11)).foregroundStyle(.secondary) }.menuStyle(.borderlessButton).padding(.horizontal, 12).padding(.bottom, 20)
         }.padding(.horizontal, 12).background(Color.accent.opacity(0.035))
     }
     private func nav(_ title: String, symbol: String, scope: String, count: Int? = nil) -> some View {
-        Button { store.scope = scope } label: { HStack(spacing: 11) { Image(systemName: symbol).frame(width: 16); Text(title); Spacer(); if let count { Text("\(count)").font(.system(size: 11)) } }.font(.system(size: 12, weight: store.scope == scope ? .semibold : .regular)).padding(11).foregroundStyle(store.scope == scope ? Color.accent : .secondary).background(store.scope == scope ? Color.accent.opacity(0.11) : .clear, in: RoundedRectangle(cornerRadius: 7)) }.buttonStyle(.plain)
+        Button { store.scope = scope } label: { HStack(spacing: 11) { Image(systemName: symbol).frame(width: 16); Text(title); Spacer(); if let count { Text("\(count)").font(.system(size: 11)) } }.font(.system(size: 12, weight: store.scope == scope ? .semibold : .regular)).padding(11).foregroundStyle(store.scope == scope ? Color.accent : .secondary).frame(maxWidth: .infinity, minHeight: 36, alignment: .leading).background(store.scope == scope ? Color.accent.opacity(0.11) : .clear, in: RoundedRectangle(cornerRadius: 7)).contentShape(Rectangle()) }.buttonStyle(.plain)
     }
     private var header: some View {
         HStack { Text("My workspace").foregroundStyle(.tertiary); Image(systemName: "chevron.right").font(.system(size: 8)); Text(store.title).foregroundStyle(.secondary); Spacer(); Image(systemName: "checkmark.icloud").foregroundStyle(Color.accent.opacity(0.6)); Text("On this Mac").foregroundStyle(.tertiary) }.font(.system(size: 11)).padding(.horizontal, 32).frame(height: 57).overlay(alignment: .bottom) { Divider().opacity(0.5) }
@@ -84,16 +74,37 @@ struct ContentView: View {
     }
     private var toolbar: some View {
         HStack(spacing: 10) {
-            Picker("View", selection: $store.board) { Label("List", systemImage: "list.bullet").tag(false); Label("Board", systemImage: "rectangle.split.3x1").tag(true) }.pickerStyle(.segmented).labelsHidden().frame(width: 160)
+            Picker("View", selection: $store.viewMode) { Label("List", systemImage: "list.bullet").tag(WorkspaceView.list); Label("Board", systemImage: "rectangle.split.3x1").tag(WorkspaceView.board); Label("Web", systemImage: "point.3.connected.trianglepath.dotted").tag(WorkspaceView.web) }.pickerStyle(.segmented).labelsHidden().frame(width: 225)
             Spacer(minLength: 0)
             TextField("Search", text: $store.search).textFieldStyle(.roundedBorder).frame(maxWidth: 150).focused($focus, equals: .search)
-            Menu {
-                Toggle("Labels", isOn: property(\.labels)); Toggle("Importance", isOn: property(\.importance)); Toggle("Due date", isOn: property(\.dueDate)); Toggle("Status", isOn: property(\.status))
-                Divider(); Toggle("Show resolved tasks", isOn: $store.showResolved); Toggle("Sort by importance", isOn: $store.sortByImportance)
-            } label: { Label("Display", systemImage: "slider.horizontal.3") }.fixedSize().menuStyle(.borderlessButton).frame(width: 78)
+            Button { showDisplay.toggle() } label: { Label("Display", systemImage: "slider.horizontal.3").font(.system(size: 12)).padding(.vertical, 5).contentShape(Rectangle()) }
+                .buttonStyle(.plain).disabled(store.viewMode == .web)
+                .popover(isPresented: $showDisplay, arrowEdge: .bottom) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("VISIBLE PROPERTIES").font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(.secondary).padding(.horizontal, 10).padding(.vertical, 8)
+                        displayProperty("Labels", key: \.labels)
+                        displayProperty("Importance", key: \.importance)
+                        displayProperty("Due date", key: \.dueDate)
+                        displayProperty("Status", key: \.status)
+                        Divider().padding(.vertical, 7)
+                        Toggle("Show resolved tasks", isOn: $store.showResolved).toggleStyle(.checkbox).font(.system(size: 11)).padding(8)
+                        Toggle("Sort by importance", isOn: $store.sortByImportance).toggleStyle(.checkbox).font(.system(size: 11)).padding(8)
+                    }.padding(10).frame(width: 230)
+                }
+
         }
     }
-    private func property(_ key: WritableKeyPath<ViewProperties, Bool>) -> Binding<Bool> { Binding(get: { store.properties[keyPath: key] }, set: { _ in store.toggleProperty(key) }) }
+    private func displayProperty(_ title: String, key: WritableKeyPath<ViewProperties, Bool>) -> some View {
+        let visible = store.properties[keyPath: key]
+        return Button { store.toggleProperty(key) } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                Image(systemName: visible ? "checkmark.square.fill" : "square").foregroundStyle(visible ? Color.accent : .secondary)
+            }.font(.system(size: 12)).padding(10).frame(maxWidth: .infinity)
+                .background(visible ? Color.accent.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: 6)).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityLabel(title).accessibilityValue(visible ? "Visible" : "Hidden")
+    }
     private var composer: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
