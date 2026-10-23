@@ -1,6 +1,6 @@
 # Tempo
 
-A native, local-first Mac task app. SwiftUI, no browser, no server, no third-party dependencies. Requires macOS 14+ and Swift 6 command line tools (full Xcode is optional).
+A native, local-first Mac task app. SwiftUI, no browser or task-data server. Sparkle handles app updates. Requires macOS 14+ and Swift 6 command line tools (full Xcode is optional).
 
 ## Run
 
@@ -45,8 +45,12 @@ swift run TempoChecks
 
 Data lives in `~/Library/Application Support/Tempo/workspace.json`, independently of the repository location. File → Export Backup creates a portable JSON copy. Restore replaces the workspace after confirmation and supports session undo. Invalid data is preserved instead of overwritten; restore a valid backup to recover.
 
-There is no sync, account, analytics, or network service. Keep regular backups. Undo stores the last workspace change; workspace undo includes edits to text fields. UI behavior still needs hands-on review. Removing a label moves its directly assigned tasks and child labels to its parent (or the top level/Inbox), and supports session undo.
+There is no task sync, account, or analytics. Release builds contact the public GitHub update feed through Sparkle. Keep regular backups. Undo stores the last workspace change; workspace undo includes edits to text fields. UI behavior still needs hands-on review. Removing a label moves its directly assigned tasks and child labels to its parent (or the top level/Inbox), and supports session undo.
 
 No commits or pushes are made by the build scripts.
 
 The checks use a standalone executable so they also run with Apple Command Line Tools installations that do not include the XCTest/Testing modules.
+
+## Downloads and updates
+
+See [Releasing Tempo](docs/RELEASING.md) for versioning, signed update packaging, GitHub Actions releases, and optional Apple notarization. The release workflow creates a draft for review; publishing it makes the stable download and update feed point to that release. Initial setup and a real two-version update test are required before calling distribution complete.

@@ -4,6 +4,7 @@ import TempoCore
 
 @main struct TempoApp: App {
     @State private var store = Store()
+    @StateObject private var updates = UpdateManager()
     var body: some Scene {
         Window("Tempo", id: "main") {
             ContentView(store: store)
@@ -14,6 +15,7 @@ import TempoCore
         .defaultSize(width: 1180, height: 800)
         .windowStyle(.hiddenTitleBar)
         .commands {
+            UpdateCommands(manager: updates)
             CommandGroup(replacing: .newItem) {
                 Button("New Task") { store.focusComposer = UUID() }.keyboardShortcut("n")
                 Button("New Subtask") { if store.selectedID != nil { NotificationCenter.default.post(name: .newSubtask, object: nil) } }.keyboardShortcut("n", modifiers: [.command, .shift]).disabled(store.selectedID == nil)

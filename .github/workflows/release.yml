@@ -1,0 +1,85 @@
+name: Release Tempo for Mac
+on:
+  push:
+    tags: ['v[0-9]*']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: tempo-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: macos-15
+    env:
+      TEMPO_UNIVERSAL: '1'
+      SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+      TEMPO_RELEASES_REPOSITORY: ${{ vars.TEMPO_RELEASES_REPOSITORY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release configuration
+        run: |
+          test -n "$SPARKLE_PRIVATE_KEY" || { echo 'Set SPARKLE_PRIVATE_KEY first.'; exit 1; }
+          if [ -z "$TEMPO_RELEASES_REPOSITORY" ]; then
+            echo "TEMPO_RELEASES_REPOSITORY=$(python3 -c 'import json; print(json.load(open("release.json"))["releasesRepository"])')" >> "$GITHUB_ENV"
+          fi
+          TEMPO_REQUIRE_UPDATES=1 python3 scripts/write-plist.py /dev/null
+          version="$(python3 -c 'import json; print(json.load(open("release.json"))["version"])')"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo 'The tag must match the version in release.json.'; exit 1
+          fi
+          echo "TEMPO_TAG=v$version" >> "$GITHUB_ENV"
+      - name: Check model behavior
+        run: swift run TempoChecks
+      - name: Import optional Apple signing credentials
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGN_IDENTITY: ${{ vars.APPLE_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$CERTIFICATE" ]; then
+            echo 'Building an ad-hoc signed beta; not notarized by Apple.'
+            exit 0
+          fi
+          test -n "$SIGN_IDENTITY" && test -n "$APPLE_ID" && test -n "$APPLE_PASSWORD" && test -n "$APPLE_TEAM_ID"
+          keychain="$RUNNER_TEMP/tempo-signing.keychain-db"
+          password="$(openssl rand -base64 32)"
+          certificate="$RUNNER_TEMP/tempo-certificate.p12"
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$certificate"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$certificate" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          rm "$certificate"
+          security set-key-partition-list -S apple-tool:,apple: -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain"
+          xcrun notarytool store-credentials tempo-ci --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_PASSWORD" --keychain "$keychain"
+          echo "TEMPO_SIGN_IDENTITY=$SIGN_IDENTITY" >> "$GITHUB_ENV"
+          echo 'TEMPO_NOTARY_PROFILE=tempo-ci' >> "$GITHUB_ENV"
+      - name: Build universal app and signed update feed
+        run: ./scripts/package-release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tempo-release
+          path: build/release/
+      - name: Create draft release in downloads repository
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN || github.token }}
+        run: |
+          latest="$(gh api "repos/$TEMPO_RELEASES_REPOSITORY/releases" --jq '[.[] | select(.draft == false and .prerelease == false)][0].tag_name // empty')"
+          if [ -n "$latest" ]; then
+            mkdir -p "$RUNNER_TEMP/previous-release"
+            gh release download "$latest" --repo "$TEMPO_RELEASES_REPOSITORY" --pattern appcast.xml --dir "$RUNNER_TEMP/previous-release"
+            python3 scripts/check-release-version.py "$RUNNER_TEMP/previous-release/appcast.xml"
+          fi
+          gh release create "$TEMPO_TAG" build/release/Tempo.zip build/release/appcast.xml build/release/SHA256SUMS.txt \
+            --repo "$TEMPO_RELEASES_REPOSITORY" --draft --title "Tempo ${TEMPO_TAG#v}" \
+            --notes 'Download Tempo.zip, unzip it, and move Tempo.app to Applications. Existing copies with updates enabled will discover this version after this release is published.'
+      - name: Clean up signing keychain
+        if: always()
+        run: |
+          keychain="$RUNNER_TEMP/tempo-signing.keychain-db"
+          if [ -f "$keychain" ]; then security delete-keychain "$keychain"; fi
