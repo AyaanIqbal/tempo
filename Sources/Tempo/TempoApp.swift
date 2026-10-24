@@ -3,6 +3,7 @@ import AppKit
 import TempoCore
 
 @main struct TempoApp: App {
+    @AppStorage("tempo.appearance") private var appearance: AppAppearance = .system
     @State private var store = Store()
     @StateObject private var updates = UpdateManager()
     var body: some Scene {
@@ -10,7 +11,9 @@ import TempoCore
             ContentView(store: store)
                 .frame(minWidth: 900, minHeight: 620)
                 .tint(Color.accent)
-                .onAppear { NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true) }
+                .preferredColorScheme(appearance.colorScheme)
+                .onChange(of: appearance) { NSApp.appearance = appearance.nativeAppearance }
+                .onAppear { NSApp.appearance = appearance.nativeAppearance; NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true) }
         }
         .defaultSize(width: 1180, height: 800)
         .windowStyle(.hiddenTitleBar)
@@ -40,13 +43,18 @@ import TempoCore
                 Button("Board View") { store.board = true }.keyboardShortcut("2")
                 Button("Web View") { store.viewMode = .web }.keyboardShortcut("3")
             }
+            CommandMenu("Appearance") {
+                Picker("Appearance", selection: $appearance) {
+                    ForEach(AppAppearance.allCases) { value in Text(value.title).tag(value) }
+                }
+            }
             CommandGroup(after: .importExport) {
                 Button("Export Backup…") { store.exportBackup() }
                 Button("Restore Backup…") { store.importBackup() }
             }
             CommandGroup(replacing: .help) { Button("Tempo Keyboard Shortcuts") { store.showHelp = true }.keyboardShortcut("/", modifiers: .command) }
         }
-
+        Settings { AppearanceSettings().tint(Color.accent) }
     }
 }
 extension Notification.Name {
@@ -56,7 +64,12 @@ extension Notification.Name {
     static let searchTasks = Notification.Name("tempo.search")
 }
 extension Color {
-    static let accent = Color(red: 0.40, green: 0.43, blue: 0.82)
+    static let accent = Color(nsColor: NSColor(name: NSColor.Name("TempoAccent"), dynamicProvider: { appearance in
+        if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+            return NSColor(srgbRed: 0.65, green: 0.67, blue: 1.0, alpha: 1)
+        }
+        return NSColor(srgbRed: 0.40, green: 0.43, blue: 0.82, alpha: 1)
+    }))
     static let canvas = Color(nsColor: .windowBackgroundColor)
     static let quiet = Color.secondary
 }
