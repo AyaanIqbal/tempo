@@ -86,3 +86,5 @@ Text editing takes precedence over task shortcuts. Completion, status/importance
 ## Appearance
 
 Choose System, Light, or Dark from the Appearance menu or Tempo → Settings (Command-comma). System is the default and follows macOS. The preference is saved on this Mac and applies to the main window, popovers, dialogs, and native controls. Dark mode uses a lighter accent for readable text and controls.
+
+The Command-K menu appears immediately as a floating overlay, with Escape, outside-click, or Command-K to close it. Actions run without a dismissal delay. The app icon is in `Assets/Tempo.icns`, with a 1024px PNG preview and editable SVG source beside it. Run `./scripts/generate-icon.sh` to rebuild all icon sizes; app packaging embeds the ICNS automatically.

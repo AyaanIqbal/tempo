@@ -16,7 +16,7 @@ struct CancelTaskView: View {
 }
 struct CommandMenuView: View {
     @Bindable var store: Store
-    @Environment(\.dismiss) private var dismiss
+    let onDismiss: () -> Void
     @State private var query = ""
     @State private var selectedIndex = 0
     @FocusState private var focused: Bool
@@ -66,8 +66,8 @@ struct CommandMenuView: View {
                     .onSubmit { activateSelected() }
                     .onKeyPress(.downArrow) { move(1); return .handled }
                     .onKeyPress(.upArrow) { move(-1); return .handled }
-                    .onKeyPress(.escape) { dismiss(); return .handled }
-                Button("Esc") { dismiss() }.font(.system(size: 10)).buttonStyle(.plain).foregroundStyle(.tertiary)
+                    .onKeyPress(.escape) { onDismiss(); return .handled }
+                Button("Esc") { onDismiss() }.font(.system(size: 10)).buttonStyle(.plain).foregroundStyle(.tertiary)
             }.padding(20)
             Divider()
             ScrollViewReader { proxy in
@@ -91,7 +91,7 @@ struct CommandMenuView: View {
             }
             Divider()
             HStack { Text("↑ ↓ to navigate"); Spacer(); Text("↵ to select · esc to close") }.font(.system(size: 10)).foregroundStyle(.tertiary).padding(.horizontal, 20).padding(.vertical, 10)
-        }.frame(width: 480).onAppear { focused = true }
+        }.frame(width: 520).onAppear { focused = true }.onExitCommand { onDismiss() }
     }
     private func move(_ offset: Int) {
         guard !actions.isEmpty else { selectedIndex = 0; return }
@@ -100,7 +100,7 @@ struct CommandMenuView: View {
     private func activateSelected() {
         guard actions.indices.contains(selectedIndex) else { return }; run(actions[selectedIndex].2)
     }
-    private func run(_ action: @escaping () -> Void) { dismiss(); Task { @MainActor in try? await Task.sleep(for: .milliseconds(200)); action() } }
+    private func run(_ action: @escaping () -> Void) { onDismiss(); action() }
 }
 struct ShortcutsView: View {
     let shortcuts = [("New task", "⌘N"), ("New subtask", "⇧⌘N"), ("Command menu", "⌘K"), ("Search tasks", "⌘F"), ("Complete / reopen", "⌘↵"), ("Next / previous task", "⌥↓ / ⌥↑"), ("List / board / web view", "⌘1 / ⌘2 / ⌘3"), ("Navigate command menu", "↑ / ↓ / ↵"), ("Focus sidebar", "⌃⌘S"), ("Sidebar views", "↑ / ↓"), ("Sidebar → tasks / tasks → sidebar", "→ / ←"), ("Task selection / open details", "↑ ↓ / ↵"), ("Subtask of selected task", "⇧↵"), ("Apply / dismiss smart entry", "Tab / ⇧Tab"), ("Importance: None → Urgent", "⌥⌘0 … ⌥⌘4"), ("Delete task and subtasks", "⇧⌘⌫"), ("Undo last task change", "⌥⌘Z")]

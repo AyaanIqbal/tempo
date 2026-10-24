@@ -20,6 +20,8 @@ if [[ ! -d "$sparkle_framework" ]]; then
   echo "Sparkle.framework was not resolved at the expected location." >&2; exit 1
 fi
 ditto "$sparkle_framework" "$APP/Contents/Frameworks/Sparkle.framework"
+test -f Assets/Tempo.icns || ./scripts/generate-icon.sh
+cp Assets/Tempo.icns "$APP/Contents/Resources/Tempo.icns"
 python3 scripts/write-plist.py "$APP/Contents/Info.plist"
 # Finder metadata is not permitted in a signed app bundle.
 xattr -cr "$APP"

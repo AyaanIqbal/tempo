@@ -4,6 +4,7 @@ import TempoCore
 struct ContentView: View {
     @Bindable var store: Store
     @State private var draft = ""
+    @State private var focusBeforeCommands: Field?
     @State private var showCaptionEditor = false
     @State private var acceptedLabel: UUID?
     @State private var dismissedMatch = false
@@ -60,7 +61,24 @@ struct ContentView: View {
                 store.acceptSelectedSuggestion()
             }
         }.allowsHitTesting(false))
-        .sheet(isPresented: $store.showCommands) { CommandMenuView(store: store) }
+        .overlay {
+            if store.showCommands {
+                GeometryReader { geometry in
+                    ZStack(alignment: .top) {
+                        Color.black.opacity(0.16).ignoresSafeArea().contentShape(Rectangle())
+                            .onTapGesture { dismissCommands() }
+                        CommandMenuView(store: store, onDismiss: dismissCommands)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(Color.primary.opacity(0.08)) }
+                            .shadow(color: .black.opacity(0.24), radius: 28, y: 12)
+                            .padding(.top, min(geometry.size.height * 0.12, 90))
+                            .frame(maxWidth: .infinity)
+                    }
+                }.transaction { $0.disablesAnimations = true }
+            }
+        }
+        .onChange(of: store.showCommands) { if store.showCommands { focusBeforeCommands = focus } }
         .sheet(isPresented: $store.showHelp) { ShortcutsView() }
         .sheet(isPresented: Binding(get: { store.pendingCancel != nil }, set: { if !$0 { store.pendingCancel = nil } })) { CancelTaskView(store: store) }
         .alert("Tempo", isPresented: Binding(get: { store.message != nil }, set: { if !$0 { store.message = nil } })) { Button("OK") { store.message = nil } } message: { Text(store.message ?? "") }
@@ -239,6 +257,10 @@ struct ContentView: View {
         acceptedLabel = label.id
         focus = .composer
         draft = String(draft.dropFirst(label.name.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    private func dismissCommands() {
+        store.showCommands = false
+        focus = focusBeforeCommands ?? .sidebar
     }
     private func returnToSidebar() {
         focus = .sidebar; store.activeRegion = .sidebar

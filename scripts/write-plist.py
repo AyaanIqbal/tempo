@@ -24,7 +24,7 @@ def metadata(config, require_updates=False):
         raise ValueError("Configure releasesRepository and publicEDKey in release.json first.")
     result = {
         "CFBundleExecutable": "Tempo", "CFBundleIdentifier": config["bundleIdentifier"],
-        "CFBundleName": "Tempo", "CFBundleDisplayName": "Tempo", "CFBundlePackageType": "APPL",
+        "CFBundleIconFile": "Tempo.icns", "CFBundleName": "Tempo", "CFBundleDisplayName": "Tempo", "CFBundlePackageType": "APPL",
         "CFBundleShortVersionString": version, "CFBundleVersion": build,
         "LSMinimumSystemVersion": "14.0", "NSHighResolutionCapable": True,
     }

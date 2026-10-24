@@ -13,7 +13,7 @@ import TempoCore
                 .tint(Color.accent)
                 .preferredColorScheme(appearance.colorScheme)
                 .onChange(of: appearance) { NSApp.appearance = appearance.nativeAppearance }
-                .onAppear { NSApp.appearance = appearance.nativeAppearance; NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true) }
+                .onAppear { if let icon = Bundle.main.url(forResource: "Tempo", withExtension: "icns") { NSApp.applicationIconImage = NSImage(contentsOf: icon) }; NSApp.appearance = appearance.nativeAppearance; NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true) }
         }
         .defaultSize(width: 1180, height: 800)
         .windowStyle(.hiddenTitleBar)
@@ -33,7 +33,7 @@ import TempoCore
                 Button("Delete Task and Subtasks") { if store.canUseTaskShortcuts { store.deleteSelected() } }.keyboardShortcut(.delete, modifiers: [.command, .shift]).disabled(!store.canUseTaskShortcuts)
             }
             CommandMenu("Navigate") {
-                Button("Command Menu…") { store.showCommands = true }.keyboardShortcut("k")
+                Button("Command Menu…") { store.showCommands.toggle() }.keyboardShortcut("k")
                 Button("Focus Sidebar") { NotificationCenter.default.post(name: .focusSidebar, object: nil) }.keyboardShortcut("s", modifiers: [.control, .command])
                 Button("Search Tasks") { NotificationCenter.default.post(name: .searchTasks, object: nil) }.keyboardShortcut("f")
                 Button("Next Task") { if store.canUseTaskShortcuts { store.selectNext(1) } }.keyboardShortcut(.downArrow, modifiers: .option).disabled(!store.canUseTaskShortcuts)
