@@ -14,11 +14,11 @@ struct SmartSuggestionCard: View {
                             store.acceptSuggestion(task: task.id, label: label.id)
                             NotificationCenter.default.post(name: .focusTasks, object: nil)
                         }.buttonStyle(.bordered)
-                        Text("Tab to accept").foregroundStyle(.tertiary)
+                        Text("Tab to apply").foregroundStyle(.tertiary)
                         Spacer(minLength: 0)
                     }.font(.system(size: 11))
                 }
-                Button("Dismiss for this task") {
+                Button("Dismiss · ⇧Tab") {
                     store.edit(task.id) { $0.smartEntryDismissed = true }
                     NotificationCenter.default.post(name: .focusTasks, object: nil)
                 }.buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)

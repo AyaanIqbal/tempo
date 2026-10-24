@@ -40,7 +40,6 @@ struct ContentView: View {
             .onKeyPress(.upArrow) { guard focus == .tasks else { return .ignored }; store.selectNext(-1); return .handled }
             .onKeyPress(.leftArrow) { guard focus == .tasks else { return .ignored }; returnToSidebar(); return .handled }
             .onKeyPress(.rightArrow) { guard focus == .tasks, let id = store.selectedID else { return .ignored }; store.openTask(id); return .handled }
-            .onKeyPress(.tab) { guard focus == .tasks, let task = store.selected, !store.workspace.smartMatches(for: task).isEmpty else { return .ignored }; store.acceptSelectedSuggestion(); return .handled }
             .onKeyPress(keys: [.return], phases: .down) { key in
                 guard focus == .tasks, !key.modifiers.contains(.command) else { return .ignored }
                 if key.modifiers.contains(.shift) { beginSubtask() }
@@ -51,6 +50,16 @@ struct ContentView: View {
                 TaskInspector(store: store, taskID: task.id).id(task.id).frame(minWidth: 300, idealWidth: 330, maxWidth: 400)
             }
         }
+        .background(SmartEntryTabHandler(enabled: canUseSmartEntryTab) { dismiss in
+            if focus == .composer {
+                if dismiss { dismissedMatch = true }
+                else if let label = store.workspace.matches(for: draft, allowExact: true).first { acceptDraftSuggestion(label) }
+            } else if dismiss, let task = store.selected {
+                store.edit(task.id) { $0.smartEntryDismissed = true }
+            } else {
+                store.acceptSelectedSuggestion()
+            }
+        }.allowsHitTesting(false))
         .sheet(isPresented: $store.showCommands) { CommandMenuView(store: store) }
         .sheet(isPresented: $store.showHelp) { ShortcutsView() }
         .sheet(isPresented: Binding(get: { store.pendingCancel != nil }, set: { if !$0 { store.pendingCancel = nil } })) { CancelTaskView(store: store) }
@@ -203,23 +212,28 @@ struct ContentView: View {
                 TextField(subtaskParent == nil ? "What needs to get done?" : "What is the next step?", text: $draft)
                     .textFieldStyle(.plain).focused($focus, equals: .composer).onSubmit(addTask)
                     .onExitCommand { subtaskParent = nil; if store.selected != nil { enterTasks() } else { returnToSidebar() } }
-                    .onKeyPress(.tab) {
-                        guard subtaskParent == nil, !dismissedMatch, acceptedLabel == nil, let match = store.workspace.matches(for: draft).first else { return .ignored }
-                        acceptDraftSuggestion(match); return .handled
-                    }
+
                 if let acceptedLabel { Text(store.workspace.labelPath(acceptedLabel).map(\.name).joined(separator: " / ")).font(.system(size: 10)).foregroundStyle(Color.accent); Button { self.acceptedLabel = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain) }
                 Text("↵").foregroundStyle(.tertiary)
             }
             if subtaskParent == nil && !dismissedMatch && acceptedLabel == nil {
-                ForEach(store.workspace.matches(for: draft)) { match in
-                    HStack { Text("Suggested:").foregroundStyle(.secondary); Button(store.workspace.labelPath(match.id).map(\.name).joined(separator: " / ")) { acceptDraftSuggestion(match) }; Text("Tab").foregroundStyle(.tertiary); Button("Dismiss") { dismissedMatch = true }.buttonStyle(.plain).foregroundStyle(.secondary) }.font(.system(size: 11))
+                ForEach(store.workspace.matches(for: draft, allowExact: true)) { match in
+                    HStack { Text("Suggested:").foregroundStyle(.secondary); Button(store.workspace.labelPath(match.id).map(\.name).joined(separator: " / ")) { acceptDraftSuggestion(match) }; Text("Tab to apply").foregroundStyle(.tertiary); Button("Dismiss · ⇧Tab") { dismissedMatch = true }.buttonStyle(.plain).foregroundStyle(.secondary) }.font(.system(size: 11))
                 }
             }
         }.padding(16).background(.background, in: RoundedRectangle(cornerRadius: 9)).overlay { RoundedRectangle(cornerRadius: 9).strokeBorder(Color.accent.opacity(0.18)) }
-        .onChange(of: draft) { if draft.isEmpty { dismissedMatch = false; acceptedLabel = nil } }
+        .onChange(of: draft) { if draft.isEmpty { dismissedMatch = false } }
     }
     @ViewBuilder private var selectedSuggestion: some View {
         if focus != .composer, let task = store.selected { SmartSuggestionCard(store: store, taskID: task.id) }
+    }
+    private var canUseSmartEntryTab: Bool {
+        guard !store.showCommands, !store.showHelp, store.pendingCancel == nil, !showCaptionEditor else { return false }
+        if focus == .composer {
+            return subtaskParent == nil && !dismissedMatch && acceptedLabel == nil && !store.workspace.matches(for: draft, allowExact: true).isEmpty
+        }
+        if focus == .tasks, let task = store.selected { return !store.workspace.smartMatches(for: task).isEmpty }
+        return false
     }
     private func acceptDraftSuggestion(_ label: TaskLabel) {
         acceptedLabel = label.id

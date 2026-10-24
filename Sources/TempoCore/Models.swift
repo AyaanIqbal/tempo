@@ -53,8 +53,8 @@ public struct Workspace: Codable, Equatable, Sendable {
         if let parent = tasks.first(where: { $0.id == task.parentID }) { return effectiveLabel(parent) }
         return task.labelID
     }
-    public func matches(for title: String) -> [TaskLabel] {
-        labels.filter { title.lowercased().hasPrefix($0.name.lowercased() + " ") }.sorted { $0.name.count > $1.name.count }
+    public func matches(for title: String, allowExact: Bool = false) -> [TaskLabel] {
+        labels.filter { title.lowercased().hasPrefix($0.name.lowercased() + " ") || (allowExact && title.caseInsensitiveCompare($0.name) == .orderedSame) }.sorted { $0.name.count > $1.name.count }
     }
     public mutating func setStatus(_ id: UUID, to status: TaskStatus, reason: String = "") throws {
         let reason = reason.trimmingCharacters(in: .whitespacesAndNewlines)

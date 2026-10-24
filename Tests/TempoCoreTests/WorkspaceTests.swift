@@ -158,3 +158,17 @@ func persistentSmartEntry() throws {
 try rolledUpCountsAndVisibleSubtasks()
 try persistentSmartEntry()
 print("Label count, nested/completed task, and persistent smart-entry checks passed (11 groups total).")
+
+func labelFirstEntry() throws {
+    var workspace = Workspace()
+    let work = try workspace.addLabel(name: "Work")
+    _ = try workspace.addLabel(name: "Work Project")
+    precondition(workspace.matches(for: "work", allowExact: true).map(\.id) == [work])
+    precondition(workspace.matches(for: "wor", allowExact: true).isEmpty)
+    precondition(workspace.matches(for: "work").isEmpty, "Existing label-only task titles must not be stripped to nothing")
+    precondition(workspace.matches(for: "work message Jason", allowExact: true).first?.id == work)
+    let id = workspace.addTask(title: "message Jason", label: work)!
+    precondition(workspace.tasks.first { $0.id == id }?.labelID == work)
+}
+try labelFirstEntry()
+print("Label-first smart-entry checks passed (12 groups total).")

@@ -69,7 +69,7 @@ Creating a task highlights it without opening the detail pane. New tasks appear 
 
 Completed tasks are visible by default; completed work stays visible below open tasks. Subtasks appear as nested rows and can be collapsed. Label counts include all tasks and inherited subtasks within the entire label branch, including completed/canceled tasks.
 
-Smart-entry matches can be accepted with Tab while typing or while a task is selected. Unaccepted suggestions appear next to a selected task, including after selecting it again later; Dismiss is stored per task. Accepting a suggestion assigns its label and removes its prefix from the title. Subtasks inherit labels, so their titles are not parsed into independent label paths.
+Smart-entry matches are applied with Tab while typing or while a task is selected. Shift-Tab dismisses the suggestion; it never applies it. When no suggestion is available, Tab and Shift-Tab keep their normal focus-navigation behavior. Unaccepted suggestions appear next to a selected task, including after selecting it again later; Dismiss is stored per task. Accepting a suggestion assigns its label and removes its prefix from the title. Subtasks inherit labels, so their titles are not parsed into independent label paths.
 
 The label property opens a searchable, indented hierarchy instead of a flat menu. Search by label name or any parent in the path; Up/Down and Enter work in the chooser.
 
