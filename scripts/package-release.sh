@@ -27,6 +27,7 @@ else
 fi
 # Verify that CI's private key matches the public key baked into the app.
 TEMPO_UPDATE_SIGNATURE="$signature" python3 scripts/create-appcast.py "$archive"
-(cd build/release && shasum -a 256 Tempo.zip > SHA256SUMS.txt)
+./scripts/create-dmg.sh
+(cd build/release && shasum -a 256 Tempo.zip Tempo.dmg > SHA256SUMS.txt)
 echo "Release $tag packaged in build/release. Nothing has been published."
-echo "Stable download: https://github.com/$repository/releases/latest/download/Tempo.zip"
+echo "Stable download: https://github.com/$repository/releases/latest/download/Tempo.dmg"

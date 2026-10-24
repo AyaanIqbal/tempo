@@ -77,9 +77,9 @@ jobs:
             gh release download "$latest" --repo "$TEMPO_RELEASES_REPOSITORY" --pattern appcast.xml --dir "$RUNNER_TEMP/previous-release"
             python3 scripts/check-release-version.py "$RUNNER_TEMP/previous-release/appcast.xml"
           fi
-          gh release create "$TEMPO_TAG" build/release/Tempo.zip build/release/appcast.xml build/release/SHA256SUMS.txt \
+          gh release create "$TEMPO_TAG" build/release/Tempo.dmg build/release/Tempo.zip build/release/appcast.xml build/release/SHA256SUMS.txt \
             --repo "$TEMPO_RELEASES_REPOSITORY" --draft --title "Tempo ${TEMPO_TAG#v}" \
-            --notes 'Download Tempo.zip, unzip it, and move Tempo.app to Applications. Existing copies with updates enabled will discover this version after this release is published.'
+            --notes 'Download Tempo.dmg, open it, and drag Tempo.app to Applications. Existing copies with updates enabled will discover this version after this release is published.'
       - name: Clean up signing keychain
         if: always()
         run: |

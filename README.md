@@ -2,6 +2,10 @@
 
 A native, local-first Mac task app. SwiftUI, no browser or task-data server. Sparkle handles app updates. Requires macOS 14+ and Swift 6 command line tools (full Xcode is optional).
 
+## Download
+
+[Download Tempo for Mac (.dmg)](https://github.com/AyaanIqbal/tempo/releases/latest/download/Tempo.dmg). Open the disk image and drag Tempo to Applications. Requires macOS 14 or later; supports Apple Silicon and Intel. This early build is not yet notarized by Apple.
+
 ## Run
 
 ```sh

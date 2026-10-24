@@ -4,9 +4,9 @@
 
 Tempo uses Sparkle 2.10 to check the public GitHub Releases feed over HTTPS, verify an Ed25519 signature, download the new app, and install/relaunch it using Sparkle's standard interface. Automatic checks and automatic downloads are enabled in release builds; Sparkle handles its user consent and installation UI. Checks run daily, or immediately from **Tempo → Check for Updates…**. The app does not force-close active work.
 
-The source and public downloads are at `AyaanIqbal/tempo`. The stable download address always follows the latest published release:
+The source and public downloads are at `AyaanIqbal/tempo`. The DMG includes Tempo.app and an Applications shortcut for drag-and-drop installation. The stable download address always follows the latest published release:
 
-https://github.com/AyaanIqbal/tempo/releases/latest/download/Tempo.zip
+https://github.com/AyaanIqbal/tempo/releases/latest/download/Tempo.dmg
 
 The update feed is:
 
@@ -47,7 +47,7 @@ The same public repository uses its built-in Actions token for release creation.
    git push origin v0.2.1
    ```
 
-4. **Actions → Release Tempo for Mac** checks the model, builds a universal Apple Silicon/Intel app, signs the ZIP, verifies the signature against the embedded public key, and creates a **draft release** with `Tempo.zip`, `appcast.xml`, and `SHA256SUMS.txt`.
+4. **Actions → Release Tempo for Mac** checks the model, builds a universal Apple Silicon/Intel app, signs the ZIP, verifies the signature against the embedded public key, and creates a **draft release** with `Tempo.dmg`, `Tempo.zip`, `appcast.xml`, and `SHA256SUMS.txt`. The ZIP remains the signed Sparkle update payload; the DMG is the human-facing download.
 5. Review the release notes and download/test the draft on a Mac. Publish the draft as the latest stable release when ready. Its appcast becomes the feed used by installed apps. Leave prereleases out of the stable channel.
 
 The workflow rejects tags that do not match `release.json` and published builds that do not increase. Release creation fails if the tag already has a release; do not overwrite a published update with different bytes. Make another version/build instead.
@@ -90,7 +90,7 @@ Packaging creates files under `build/release/` and **never commits, tags, pushes
 After reviewing a locally packaged release, you can create a draft manually:
 
 ```sh
-gh release create v0.2.1 build/release/Tempo.zip build/release/appcast.xml build/release/SHA256SUMS.txt --repo AyaanIqbal/tempo --draft --title 'Tempo 0.2.1'
+gh release create v0.2.1 build/release/Tempo.dmg build/release/Tempo.zip build/release/appcast.xml build/release/SHA256SUMS.txt --repo AyaanIqbal/tempo --draft --title 'Tempo 0.2.1'
 ```
 
 ## Verify the first actual update
