@@ -21,6 +21,8 @@ if [[ ! -d "$sparkle_framework" ]]; then
 fi
 ditto "$sparkle_framework" "$APP/Contents/Frameworks/Sparkle.framework"
 python3 scripts/write-plist.py "$APP/Contents/Info.plist"
+# Finder metadata is not permitted in a signed app bundle.
+xattr -cr "$APP"
 if [[ -n "${TEMPO_SIGN_IDENTITY:-}" ]]; then
   # Sign nested code from the inside out, preserving Sparkle's helper entitlements.
   framework="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"

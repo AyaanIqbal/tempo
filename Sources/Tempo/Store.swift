@@ -41,6 +41,12 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", 
         } catch { loadFailed = true; message = "Could not read your saved workspace. Your data has been preserved. Restore a backup or fix the data file before editing. \(error.localizedDescription)" }
     }
     var selected: TaskItem? { workspace.tasks.first { $0.id == selectedID } }
+    var isEditingText: Bool {
+        if let editor = NSApp?.keyWindow?.firstResponder as? NSTextView, editor.isEditable { return true }
+        if let field = NSApp?.keyWindow?.firstResponder as? NSTextField, field.isEditable { return true }
+        return activeRegion == .editor
+    }
+    var canUseTaskShortcuts: Bool { selectedID != nil && activeRegion == .tasks && !isEditingText }
     var inspected: TaskItem? { workspace.tasks.first { $0.id == inspectorID } }
     var taskRows: [TaskTreeRow] { workspace.taskRows(roots: roots, collapsed: collapsedTasks, showResolved: board || showResolved, byImportance: sortByImportance) }
     var properties: ViewProperties { board ? workspace.boardProperties : workspace.listProperties }

@@ -76,3 +76,5 @@ The label property opens a searchable, indented hierarchy instead of a flat menu
 Run `./scripts/check-interactions.sh` to verify selection versus explicit opening, new-task order, subtask navigation, completed visibility, smart matching, and persisted workspace data using a temporary workspace (not your real tasks).
 
 Summary cards count only the current view: all work in All tasks, unlabeled work in Inbox, due-today work in Today, and the full current label branch in label views. Task order is In progress, To do, Done, then Canceled; optional priority sorting applies within each status. Nested tasks follow the same ordering within their parent. Moving between sidebar and task list transfers the highlight to the active region while remembering the selected task.
+
+Text editing takes precedence over task shortcuts. Completion, status/importance changes, task deletion, and task navigation shortcuts are disabled while editing text. Task deletion uses Shift-Command-Delete; Command-Delete stays available for native text deletion. Command-Z uses native text undo; Option-Command-Z undoes the last workspace change outside text editing.

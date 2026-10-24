@@ -46,9 +46,13 @@ import TempoCore
         precondition(store.roots.first?.id == smart, "In-progress tasks precede newer To do tasks")
         precondition(store.roots.last?.id == first, "Completed tasks belong below open work")
         store.selectedID = smart
+        store.activeRegion = .editor
+        precondition(!store.canUseTaskShortcuts, "Typing must disable task shortcuts even with a task selected")
         store.activeRegion = .sidebar
+        precondition(!store.canUseTaskShortcuts, "Sidebar navigation must not mutate a previously selected task")
         precondition(!store.highlightsTask(smart), "Returning to the sidebar clears the task highlight")
         store.activeRegion = .tasks
+        precondition(store.canUseTaskShortcuts, "Task shortcuts should work after leaving text editing")
         precondition(store.highlightsTask(smart), "Entering tasks highlights only the task region")
         store.toggleProperty(\.labels)
         store.viewMode = .board

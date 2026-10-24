@@ -18,23 +18,23 @@ import TempoCore
             UpdateCommands(manager: updates)
             CommandGroup(replacing: .newItem) {
                 Button("New Task") { store.focusComposer = UUID() }.keyboardShortcut("n")
-                Button("New Subtask") { if store.selectedID != nil { NotificationCenter.default.post(name: .newSubtask, object: nil) } }.keyboardShortcut("n", modifiers: [.command, .shift]).disabled(store.selectedID == nil)
+                Button("New Subtask") { if store.canUseTaskShortcuts { NotificationCenter.default.post(name: .newSubtask, object: nil) } }.keyboardShortcut("n", modifiers: [.command, .shift]).disabled(!store.canUseTaskShortcuts)
             }
-            CommandGroup(replacing: .undoRedo) { Button("Undo Last Change") { store.undo() }.keyboardShortcut("z").disabled(store.undoWorkspace == nil) }
+            CommandGroup(after: .undoRedo) { Button("Undo Last Task Change") { if !store.isEditingText { store.undo() } }.keyboardShortcut("z", modifiers: [.command, .option]).disabled(store.undoWorkspace == nil || store.isEditingText) }
             CommandMenu("Task") {
-                Button("Complete / Reopen") { if let id = store.selectedID { store.toggle(id) } }.keyboardShortcut(.return).disabled(store.selectedID == nil)
-                ForEach(TaskStatus.allCases, id: \.self) { status in Button(status.rawValue) { if let id = store.selectedID { store.status(id, status) } }.disabled(store.selectedID == nil) }
+                Button("Complete / Reopen") { if store.canUseTaskShortcuts, let id = store.selectedID { store.toggle(id) } }.keyboardShortcut(.return).disabled(!store.canUseTaskShortcuts)
+                ForEach(TaskStatus.allCases, id: \.self) { status in Button(status.rawValue) { if store.canUseTaskShortcuts, let id = store.selectedID { store.status(id, status) } }.disabled(!store.canUseTaskShortcuts) }
                 Divider()
-                ForEach(Importance.allCases, id: \.self) { priority in Button("Importance: \(priority.title)") { if let id = store.selectedID { store.edit(id) { $0.importance = priority } } }.keyboardShortcut(KeyEquivalent(Character(String(priority.rawValue))), modifiers: [.command, .option]).disabled(store.selectedID == nil) }
+                ForEach(Importance.allCases, id: \.self) { priority in Button("Importance: \(priority.title)") { if store.canUseTaskShortcuts, let id = store.selectedID { store.edit(id) { $0.importance = priority } } }.keyboardShortcut(KeyEquivalent(Character(String(priority.rawValue))), modifiers: [.command, .option]).disabled(!store.canUseTaskShortcuts) }
                 Divider()
-                Button("Delete Task and Subtasks") { store.deleteSelected() }.keyboardShortcut(.delete, modifiers: .command).disabled(store.selectedID == nil)
+                Button("Delete Task and Subtasks") { if store.canUseTaskShortcuts { store.deleteSelected() } }.keyboardShortcut(.delete, modifiers: [.command, .shift]).disabled(!store.canUseTaskShortcuts)
             }
             CommandMenu("Navigate") {
                 Button("Command Menu…") { store.showCommands = true }.keyboardShortcut("k")
                 Button("Focus Sidebar") { NotificationCenter.default.post(name: .focusSidebar, object: nil) }.keyboardShortcut("s", modifiers: [.control, .command])
                 Button("Search Tasks") { NotificationCenter.default.post(name: .searchTasks, object: nil) }.keyboardShortcut("f")
-                Button("Next Task") { store.selectNext(1) }.keyboardShortcut(.downArrow, modifiers: .option)
-                Button("Previous Task") { store.selectNext(-1) }.keyboardShortcut(.upArrow, modifiers: .option)
+                Button("Next Task") { if store.canUseTaskShortcuts { store.selectNext(1) } }.keyboardShortcut(.downArrow, modifiers: .option).disabled(!store.canUseTaskShortcuts)
+                Button("Previous Task") { if store.canUseTaskShortcuts { store.selectNext(-1) } }.keyboardShortcut(.upArrow, modifiers: .option).disabled(!store.canUseTaskShortcuts)
                 Divider()
                 Button("List View") { store.board = false }.keyboardShortcut("1")
                 Button("Board View") { store.board = true }.keyboardShortcut("2")

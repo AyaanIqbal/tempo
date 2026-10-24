@@ -50,7 +50,7 @@ struct CommandMenuView: View {
             }
         }
         if let id = store.selectedID {
-            items += [("Complete / reopen task", "⌘↵", { store.toggle(id) }), ("Delete task", "⌘⌫", { store.deleteSelected() })]
+            items += [("Complete / reopen task", "⌘↵", { store.toggle(id) }), ("Delete task", "⇧⌘⌫", { store.deleteSelected() })]
             items += TaskStatus.allCases.map { status in ("Set status: \(status.rawValue)", "", { store.status(id, status) }) }
             items += Importance.allCases.map { priority in ("Set importance: \(priority.title)", "⌥⌘\(priority.rawValue)", { store.edit(id) { $0.importance = priority } }) }
         }
@@ -103,7 +103,7 @@ struct CommandMenuView: View {
     private func run(_ action: @escaping () -> Void) { dismiss(); Task { @MainActor in try? await Task.sleep(for: .milliseconds(200)); action() } }
 }
 struct ShortcutsView: View {
-    let shortcuts = [("New task", "⌘N"), ("New subtask", "⇧⌘N"), ("Command menu", "⌘K"), ("Search tasks", "⌘F"), ("Complete / reopen", "⌘↵"), ("Next / previous task", "⌥↓ / ⌥↑"), ("List / board / web view", "⌘1 / ⌘2 / ⌘3"), ("Navigate command menu", "↑ / ↓ / ↵"), ("Focus sidebar", "⌃⌘S"), ("Sidebar views", "↑ / ↓"), ("Sidebar → tasks / tasks → sidebar", "→ / ←"), ("Task selection / open details", "↑ ↓ / ↵"), ("Subtask of selected task", "⇧↵"), ("Apply / dismiss smart entry", "Tab / ⇧Tab"), ("Importance: None → Urgent", "⌥⌘0 … ⌥⌘4"), ("Delete task and subtasks", "⌘⌫"), ("Undo last change", "⌘Z")]
+    let shortcuts = [("New task", "⌘N"), ("New subtask", "⇧⌘N"), ("Command menu", "⌘K"), ("Search tasks", "⌘F"), ("Complete / reopen", "⌘↵"), ("Next / previous task", "⌥↓ / ⌥↑"), ("List / board / web view", "⌘1 / ⌘2 / ⌘3"), ("Navigate command menu", "↑ / ↓ / ↵"), ("Focus sidebar", "⌃⌘S"), ("Sidebar views", "↑ / ↓"), ("Sidebar → tasks / tasks → sidebar", "→ / ←"), ("Task selection / open details", "↑ ↓ / ↵"), ("Subtask of selected task", "⇧↵"), ("Apply / dismiss smart entry", "Tab / ⇧Tab"), ("Importance: None → Urgent", "⌥⌘0 … ⌥⌘4"), ("Delete task and subtasks", "⇧⌘⌫"), ("Undo last task change", "⌥⌘Z")]
 
     @Environment(\.dismiss) private var dismiss
     var body: some View { VStack(alignment: .leading, spacing: 16) { HStack { Text("Keep your hands on the keys").font(.system(size: 20, weight: .semibold)); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }; ForEach(shortcuts, id: \.0) { name, keys in HStack { Text(name); Spacer(); Text(keys).foregroundStyle(.secondary).monospaced() }.font(.system(size: 12)); Divider() } }.padding(28).frame(width: 470) }

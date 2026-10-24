@@ -34,7 +34,7 @@ struct LabelExplorer: View {
         }
         .confirmationDialog("Remove label?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
             Button("Remove label", role: .destructive) { if let id = removing { store.removeLabel(id) }; removing = nil }
-        } message: { Text("Tasks are kept. Sub-labels and directly assigned tasks move up one level. You can undo with ⌘Z.") }
+        } message: { Text("Tasks are kept. Sub-labels and directly assigned tasks move up one level. You can undo with ⌥⌘Z.") }
     }
     private func labelRow(_ row: LabelTreeRow) -> some View {
         let hasChildren = store.workspace.labels.contains { $0.parentID == row.id }
