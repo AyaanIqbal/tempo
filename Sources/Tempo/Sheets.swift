@@ -28,7 +28,6 @@ struct CommandMenuView: View {
             ("Today", "", { store.openScope("today") }),
             ("List view", "⌘1", { store.viewMode = .list }),
             ("Board view", "⌘2", { store.viewMode = .board }),
-            ("Web view", "⌘3", { store.viewMode = .web }),
             ("Export backup", "", { store.exportBackup() }),
             ("Restore backup", "", { store.importBackup() }),
             ("Keyboard shortcuts", "⌘/", { store.showHelp = true })
@@ -103,7 +102,7 @@ struct CommandMenuView: View {
     private func run(_ action: @escaping () -> Void) { onDismiss(); action() }
 }
 struct ShortcutsView: View {
-    let shortcuts = [("New task", "⌘N"), ("New subtask", "⇧⌘N"), ("Command menu", "⌘K"), ("Search tasks", "⌘F"), ("Complete / reopen", "⌘↵"), ("Next / previous task", "⌥↓ / ⌥↑"), ("List / board / web view", "⌘1 / ⌘2 / ⌘3"), ("Navigate command menu", "↑ / ↓ / ↵"), ("Focus sidebar", "⌃⌘S"), ("Sidebar views", "↑ / ↓"), ("Sidebar → tasks / tasks → sidebar", "→ / ←"), ("Task selection / open details", "↑ ↓ / ↵"), ("Subtask of selected task", "⇧↵"), ("Apply / dismiss smart entry", "Tab / ⇧Tab"), ("Importance: None → Urgent", "⌥⌘0 … ⌥⌘4"), ("Delete task and subtasks", "⇧⌘⌫"), ("Undo last task change", "⌥⌘Z")]
+    let shortcuts = [("New task", "⌘N"), ("New subtask", "⇧⌘N"), ("Command menu", "⌘K"), ("Search tasks", "⌘F"), ("Complete / reopen", "⌘↵"), ("Next / previous task", "⌥↓ / ⌥↑"), ("List / board view", "⌘1 / ⌘2"), ("Navigate command menu", "↑ / ↓ / ↵"), ("Focus sidebar", "⌃⌘S"), ("Sidebar views", "↑ / ↓"), ("Sidebar → tasks / tasks → sidebar", "→ / ←"), ("Task selection / open details", "↑ ↓ / ↵"), ("Subtask of selected task", "⇧↵"), ("Apply / dismiss smart entry", "Tab / ⇧Tab"), ("Importance: None → Urgent", "⌥⌘0 … ⌥⌘4"), ("Delete task and subtasks", "⇧⌘⌫"), ("Undo last task change", "⌥⌘Z")]
 
     @Environment(\.dismiss) private var dismiss
     var body: some View { VStack(alignment: .leading, spacing: 16) { HStack { Text("Keep your hands on the keys").font(.system(size: 20, weight: .semibold)); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }; ForEach(shortcuts, id: \.0) { name, keys in HStack { Text(name); Spacer(); Text(keys).foregroundStyle(.secondary).monospaced() }.font(.system(size: 12)); Divider() } }.padding(28).frame(width: 470) }

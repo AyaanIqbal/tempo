@@ -42,7 +42,6 @@ swift run TempoChecks
 - Full-width sidebar navigation targets, including the padding around labels.
 - Labels use simple dot markers. Right-click a label to rename, move, or remove it directly in the sidebar.
 - Property controls sit on the right of the toolbar, with search in the middle and the view selector on the left. Click Labels, Importance, Due date, or Status directly to show/hide them. Settings stay independent for list and board. Completed tasks stay visible; status ordering puts in-progress work first and completed work last.
-- Web view (⌘3): a native, zoomable map connecting labels, tasks, and subtasks. Status icons and colors distinguish open, in-progress, done, and canceled work; resolved tasks are included by default. Search and sidebar filters apply to the map. Click tasks to inspect them or their status icons to complete/reopen them.
 - Automatic local JSON saving, atomic writes, export/restore, and session undo for deletions and edits.
 
 ## Data

@@ -29,7 +29,7 @@ struct ContentView: View {
                         toolbar
                         composer
                         if store.viewMode != .list { selectedSuggestion }
-                        if store.viewMode == .web { TaskWebView(store: store) } else if store.board { board } else { taskList }
+                        if store.board { board } else { taskList }
                         HStack { Spacer(); Text("A little structure. A little more headspace.").font(.system(size: 11)).foregroundStyle(.tertiary); Spacer() }.padding(.top, 10)
                     }.padding(32).frame(maxWidth: 1080).frame(maxWidth: .infinity)
                 }
@@ -174,11 +174,11 @@ struct ContentView: View {
                 Spacer(minLength: 0)
                 taskSearch.frame(width: 160)
                 Spacer(minLength: 0)
-                if store.viewMode != .web { propertyControls }
+                propertyControls
             }
             VStack(spacing: 12) {
                 HStack(spacing: 16) { viewSelector; Spacer(minLength: 0); taskSearch.frame(maxWidth: 180) }
-                if store.viewMode != .web { HStack { Spacer(); propertyControls } }
+                HStack { Spacer(); propertyControls }
             }
         }
     }
@@ -186,8 +186,7 @@ struct ContentView: View {
         Picker("View", selection: $store.viewMode) {
             Label("List", systemImage: "list.bullet").tag(WorkspaceView.list)
             Label("Board", systemImage: "rectangle.split.3x1").tag(WorkspaceView.board)
-            Label("Web", systemImage: "point.3.connected.trianglepath.dotted").tag(WorkspaceView.web)
-        }.pickerStyle(.segmented).labelsHidden().frame(width: 225)
+        }.pickerStyle(.segmented).labelsHidden().fixedSize(horizontal: true, vertical: false)
     }
     private var taskSearch: some View {
         HStack(spacing: 7) {

@@ -5,7 +5,7 @@ import TempoCore
 
 enum NavigationRegion: Hashable { case sidebar, tasks, editor }
 
-enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board", web = "Web" }
+enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
 
 @MainActor @Observable final class Store {
     var workspace = Workspace()

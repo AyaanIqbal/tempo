@@ -66,26 +66,8 @@ func labelTreeEditing() throws {
     precondition(w.labelPath(backend).map(\.name) == ["School", "Backend"])
     try w.validate()
 }
-func graphRelationshipsAndCompletion() throws {
-    var w = Workspace(); let work = try w.addLabel(name: "Work"); let edge = try w.addLabel(name: "Edge Security", parent: work)
-    let parent = w.addTask(title: "WAF", label: edge)!; let child = w.addTask(title: "Harvester", parent: parent)!
-    try w.setStatus(child, to: .done)
-    let inbox = w.addTask(title: "Unlabeled task")!
-    var graph = w.taskGraph()
-    precondition(graph.first { $0.itemID == child }?.parent == "task-\(parent)")
-    precondition(graph.first { $0.itemID == child }?.status == .done)
-    precondition(graph.first { $0.itemID == parent }?.parent == "label-\(edge)")
-    precondition(graph.first { $0.itemID == edge }?.parent == "label-\(work)")
-    precondition(graph.first { $0.itemID == inbox }?.parent == "inbox")
-    graph = w.taskGraph(scope: edge.uuidString, query: "Harvester")
-    precondition(graph.contains { $0.itemID == parent })
-    precondition(!graph.contains { $0.itemID == inbox })
-    precondition(graph.allSatisfy { node in node.parent == nil || graph.contains { $0.id == node.parent } })
-    precondition(!w.taskGraph(includeResolved: false).contains { $0.itemID == child })
-}
 try labelTreeEditing()
-try graphRelationshipsAndCompletion()
-print("Passed label editing/tree and graph relationship/completion checks (7 groups total).")
+print("Passed label editing/tree checks (6 groups total).")
 
 func captionsAndLegacyLabels() throws {
     var workspace = Workspace()
@@ -106,7 +88,7 @@ func captionsAndLegacyLabels() throws {
     precondition(workspace.viewCaption(for: school.uuidString) == "Tasks and progress for School.")
 }
 try captionsAndLegacyLabels()
-print("Caption persistence, defaults, and legacy compatibility checks passed (8 groups total).")
+print("Caption persistence, defaults, and legacy compatibility checks passed (7 groups total).")
 
 func sidebarOrderAndBreadcrumbs() throws {
     var workspace = Workspace()
@@ -121,7 +103,7 @@ func sidebarOrderAndBreadcrumbs() throws {
     precondition(workspace.labelPath(nested).map(\.name) == ["Work", "AI Sec", "Research"])
 }
 try sidebarOrderAndBreadcrumbs()
-print("Sidebar navigation and breadcrumb checks passed (9 groups total).")
+print("Sidebar navigation and breadcrumb checks passed (8 groups total).")
 
 func rolledUpCountsAndVisibleSubtasks() throws {
     var w = Workspace(); let work = try w.addLabel(name: "Work")
@@ -157,7 +139,7 @@ func persistentSmartEntry() throws {
 }
 try rolledUpCountsAndVisibleSubtasks()
 try persistentSmartEntry()
-print("Label count, nested/completed task, and persistent smart-entry checks passed (11 groups total).")
+print("Label count, nested/completed task, and persistent smart-entry checks passed (10 groups total).")
 
 func labelFirstEntry() throws {
     var workspace = Workspace()
@@ -171,4 +153,4 @@ func labelFirstEntry() throws {
     precondition(workspace.tasks.first { $0.id == id }?.labelID == work)
 }
 try labelFirstEntry()
-print("Label-first smart-entry checks passed (12 groups total).")
+print("Label-first smart-entry checks passed (11 groups total).")

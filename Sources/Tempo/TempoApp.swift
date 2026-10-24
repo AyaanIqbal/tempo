@@ -41,7 +41,6 @@ import TempoCore
                 Divider()
                 Button("List View") { store.board = false }.keyboardShortcut("1")
                 Button("Board View") { store.board = true }.keyboardShortcut("2")
-                Button("Web View") { store.viewMode = .web }.keyboardShortcut("3")
             }
             CommandMenu("Appearance") {
                 Picker("Appearance", selection: $appearance) {
