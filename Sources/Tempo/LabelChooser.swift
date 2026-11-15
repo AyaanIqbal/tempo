@@ -12,7 +12,7 @@ struct LabelChooser: View {
     private var rows: [LabelTreeRow] {
         let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
         return store.workspace.labelRows().filter { row in
-            let path = store.workspace.labelPath(row.id).map(\.name).joined(separator: " / ")
+            let path = store.workspace.labelPath(row.id).map(\.name).joined(separator: " > ")
             return terms.allSatisfy { path.localizedCaseInsensitiveContains($0) }
         }
     }
@@ -22,7 +22,7 @@ struct LabelChooser: View {
             Spacer()
             Button { query = ""; highlighted = 0; presented = true } label: {
                 HStack(spacing: 7) { Text(store.workspace.labelPath(selection).last?.name ?? "None").lineLimit(1); Image(systemName: "chevron.up.chevron.down").font(.system(size: 8)) }.padding(.horizontal, 9).padding(.vertical, 6).background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 5)).contentShape(Rectangle())
-            }.buttonStyle(.plain).help(store.workspace.labelPath(selection).map(\.name).joined(separator: " / "))
+            }.buttonStyle(.tempo).help(store.workspace.labelPath(selection).map(\.name).joined(separator: " > "))
             .popover(isPresented: $presented) {
                 VStack(alignment: .leading, spacing: 9) {
                     HStack { Image(systemName: "magnifyingglass").foregroundStyle(.secondary); TextField("Find a label…", text: $query).textFieldStyle(.plain).focused($searching)
@@ -37,7 +37,7 @@ struct LabelChooser: View {
                             VStack(spacing: 2) {
                                 option(index: 0, id: nil, title: "None", path: "", depth: 0)
                                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                                    option(index: index + 1, id: row.id, title: row.label.name, path: query.isEmpty ? "" : store.workspace.labelPath(row.id).dropLast().map(\.name).joined(separator: " / "), depth: query.isEmpty ? row.depth : 0)
+                                    option(index: index + 1, id: row.id, title: row.label.name, path: query.isEmpty ? "" : store.workspace.labelPath(row.id).dropLast().map(\.name).joined(separator: " > "), depth: query.isEmpty ? row.depth : 0)
                                 }
                             }
                         }.frame(maxHeight: 270)
@@ -55,7 +55,7 @@ struct LabelChooser: View {
                 VStack(alignment: .leading, spacing: 3) { Text(title); if !path.isEmpty { Text(path).font(.system(size: 9)).foregroundStyle(.secondary) } }
                 Spacer(); if selection == id { Image(systemName: "checkmark").foregroundStyle(Color.accent) }
             }.font(.system(size: 12)).padding(.vertical, 9).padding(.leading, 10 + CGFloat(depth) * 13).padding(.trailing, 10).frame(maxWidth: .infinity, alignment: .leading).background(highlighted == index ? Color.accent.opacity(0.09) : .clear, in: RoundedRectangle(cornerRadius: 5)).contentShape(Rectangle())
-        }.buttonStyle(.plain).id(index)
+        }.buttonStyle(.tempo).id(index)
     }
     private func move(_ offset: Int) { highlighted = min(max(highlighted + offset, 0), rows.count) }
     private func choose(_ index: Int) { guard index == 0 || rows.indices.contains(index - 1) else { return }; selection = index == 0 ? nil : rows[index - 1].id; presented = false }

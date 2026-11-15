@@ -12,6 +12,19 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
     var activeRegion: NavigationRegion = .sidebar
     var selectedID: UUID?
     var inspectorID: UUID?
+    var inlineSubtaskParent: UUID?
+    var inlineSubtaskDraft = ""
+    private var inlineDraftParent: UUID?
+    var focusNotesID: UUID?
+    var notesFocusRequest = UUID()
+    var statusFilter: TaskStatus?
+    var showInProgress: Bool {
+        didSet {
+            preferences.set(showInProgress, forKey: "tempo.showInProgress")
+            if !showInProgress && statusFilter == .inProgress { statusFilter = nil }
+        }
+    }
+    private let preferences: UserDefaults
     var collapsedTasks: Set<UUID> = []
     var scope = "all"
     var collapsedLabels: Set<UUID> = []
@@ -31,7 +44,9 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
     var undoWorkspace: Workspace?
     private var loadFailed = false
     private let fileURL: URL
-    init(fileURL: URL = URL.applicationSupportDirectory.appending(path: "Tempo/workspace.json")) {
+    init(fileURL: URL = URL.applicationSupportDirectory.appending(path: "Tempo/workspace.json"), preferences: UserDefaults = .standard) {
+        self.preferences = preferences
+        self.showInProgress = preferences.bool(forKey: "tempo.showInProgress")
         self.fileURL = fileURL
         do {
             if FileManager.default.fileExists(atPath: fileURL.path) {
@@ -48,25 +63,56 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
     }
     var canUseTaskShortcuts: Bool { selectedID != nil && activeRegion == .tasks && !isEditingText }
     var inspected: TaskItem? { workspace.tasks.first { $0.id == inspectorID } }
-    var taskRows: [TaskTreeRow] { workspace.taskRows(roots: roots, collapsed: collapsedTasks, showResolved: board || showResolved, byImportance: sortByImportance) }
+    var taskRows: [TaskTreeRow] { workspace.taskRows(roots: roots, collapsed: collapsedTasks, showResolved: board || showResolved, byImportance: sortByImportance).filter { visibleTaskIDs.contains($0.id) } }
     var properties: ViewProperties { board ? workspace.boardProperties : workspace.listProperties }
     var scopedTasks: [TaskItem] {
         workspace.tasks.filter { task in
-            scope == "all" || (scope == "inbox" && workspace.effectiveLabel(task) == nil)
+            scope == "all"
             || (scope == "today" && task.dueDate.map { Calendar.current.isDateInToday($0) } == true)
             || workspace.labelPath(workspace.effectiveLabel(task)).contains { $0.id.uuidString == scope }
         }
     }
-    var roots: [TaskItem] {
-        let filtered = scopedTasks.filter { task in
-            guard task.parentID == nil else { return false }
-            let matches = task.title.localizedCaseInsensitiveContains(search) || task.notes.localizedCaseInsensitiveContains(search) || workspace.descendants(of: task.id).contains { id in workspace.tasks.first { $0.id == id }?.title.localizedCaseInsensitiveContains(search) == true }
-            return (search.isEmpty || matches) && (board || showResolved || !task.status.isResolved)
+    var visibleTaskIDs: Set<UUID> {
+        var ids: Set<UUID> = []
+        for task in scopedTasks {
+            guard statusFilter == nil || displayStatus(task) == statusFilter else { continue }
+            guard search.isEmpty || task.title.localizedCaseInsensitiveContains(search) || task.notes.localizedCaseInsensitiveContains(search) else { continue }
+            guard showResolved || !task.status.isResolved || board else { continue }
+            ids.insert(task.id)
+            var parent = task.parentID
+            while let id = parent { ids.insert(id); parent = workspace.tasks.first { $0.id == id }?.parentID }
         }
-        return workspace.sortedTasks(filtered, byImportance: sortByImportance)
+        return ids
+    }
+    var roots: [TaskItem] {
+        workspace.sortedTasks(workspace.tasks.filter { $0.parentID == nil && visibleTaskIDs.contains($0.id) }, byImportance: sortByImportance)
+    }
+    var availableStatuses: [TaskStatus] { TaskStatus.allCases.filter { showInProgress || $0 != .inProgress } }
+    var boardStatuses: [TaskStatus] { availableStatuses.filter { $0 != .canceled || scopedTasks.contains { $0.status == .canceled } } }
+    func displayStatus(_ task: TaskItem) -> TaskStatus { !showInProgress && task.status == .inProgress ? .todo : task.status }
+    func summaryCount(_ status: TaskStatus) -> Int { scopedTasks.filter { displayStatus($0) == status }.count }
+    func toggleStatusFilter(_ status: TaskStatus) {
+        statusFilter = statusFilter == status ? nil : status
+        selectedID = nil; inspectorID = nil; inlineSubtaskParent = nil
+    }
+    func beginInlineSubtask(of id: UUID) {
+        guard workspace.tasks.contains(where: { $0.id == id }) else { return }
+        viewMode = .list; search = ""; statusFilter = nil
+        if inlineDraftParent != id { inlineSubtaskDraft = "" }
+        inlineDraftParent = id
+        inlineSubtaskParent = id; collapsedTasks.remove(id); selectedID = id; activeRegion = .editor
+    }
+    @discardableResult func submitInlineSubtask(nest: Bool = false) -> UUID? {
+        guard let parent = inlineSubtaskParent, let id = add(inlineSubtaskDraft, parent: parent) else { return nil }
+        inlineSubtaskDraft = ""
+        if nest { beginInlineSubtask(of: id) }
+        return id
+    }
+    func editNotes(_ id: UUID) {
+        openTask(id); viewMode = .list; focusNotesID = id
     }
     func highlightsTask(_ id: UUID) -> Bool { activeRegion == .tasks && selectedID == id }
-    var title: String { switch scope { case "all": "All tasks"; case "inbox": "Inbox"; case "today": "Today"; default: workspace.labels.first { $0.id.uuidString == scope }?.name ?? "All tasks" } }
+    var title: String { switch scope { case "all": "All tasks"; case "today": "Today"; default: workspace.labels.first { $0.id.uuidString == scope }?.name ?? "All tasks" } }
     func save(_ before: Workspace? = nil) {
         guard !loadFailed else { if let before { workspace = before }; message = "Saving is disabled because the existing data file could not be read. Restore a valid backup first."; return }
         do {
@@ -85,7 +131,24 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
         selectedID = id; save(before)
         return workspace.tasks.contains(where: { $0.id == id }) ? id : nil
     }
-    func openTask(_ id: UUID) { selectedID = id; inspectorID = id; activeRegion = .tasks }
+    func openTask(_ id: UUID) {
+        for ancestor in workspace.tasks where workspace.descendants(of: ancestor.id).contains(id) { collapsedTasks.remove(ancestor.id) }
+        selectedID = id; inspectorID = id; focusNotesID = id; notesFocusRequest = UUID(); activeRegion = .editor }
+    func navigateBack() {
+        if inspectorID != nil || inlineSubtaskParent != nil {
+            inspectorID = nil; inlineSubtaskParent = nil; activeRegion = .tasks
+        } else if activeRegion == .editor {
+            activeRegion = selectedID == nil ? .sidebar : .tasks
+        } else if activeRegion == .tasks {
+            activeRegion = .sidebar
+        } else {
+            openScope("all"); activeRegion = .sidebar
+        }
+    }
+    func requestNewTask() {
+        inspectorID = nil; inlineSubtaskParent = nil; statusFilter = nil; search = ""
+        activeRegion = .editor; focusComposer = UUID()
+    }
     func closeInspector() { inspectorID = nil }
     func acceptSelectedSuggestion() {
         guard let task = selected, let label = workspace.smartMatches(for: task).first else { return }
@@ -109,7 +172,7 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
     }
     func deleteSelected() {
         guard let id = selectedID else { return }; let before = workspace
-        let removed = Set([id] + workspace.descendants(of: id)); workspace.delete(id); selectedID = nil; if let inspectorID, removed.contains(inspectorID) { self.inspectorID = nil }; save(before)
+        let removed = Set([id] + workspace.descendants(of: id)); workspace.delete(id); selectedID = nil; if let parent = inlineSubtaskParent, removed.contains(parent) { inlineSubtaskParent = nil; inlineSubtaskDraft = "" }; if let inspectorID, removed.contains(inspectorID) { self.inspectorID = nil }; save(before)
     }
     func undo() { guard let previous = undoWorkspace else { return }; let current = workspace; workspace = previous; save(current) }
     func toggleProperty(_ key: WritableKeyPath<ViewProperties, Bool>) {
@@ -158,7 +221,7 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
     }
     func openScope(_ scope: String) {
         activeRegion = .sidebar
-        self.scope = scope; selectedID = nil; inspectorID = nil; search = ""
+        self.scope = scope; statusFilter = nil; inlineSubtaskParent = nil; selectedID = nil; inspectorID = nil; search = ""
         revealCurrentLabel()
     }
     func revealCurrentLabel() {
@@ -180,7 +243,7 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
     func selectNext(_ offset: Int) {
         activeRegion = .tasks
         inspectorID = nil
-        let items = viewMode == .board ? TaskStatus.allCases.flatMap { status in roots.filter { $0.status == status } } : taskRows.map(\.task)
+        let items = viewMode == .board ? boardStatuses.flatMap { status in roots.filter { displayStatus($0) == status } } : taskRows.map(\.task)
         guard !items.isEmpty else { return }
         let index = items.firstIndex { $0.id == selectedID } ?? (offset > 0 ? -1 : items.count)
         selectedID = items[min(max(index + offset, 0), items.count - 1)].id

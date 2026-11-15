@@ -12,7 +12,7 @@ struct LabelCaptionEditor: View {
             Text("Give this label view a little context of its own.").font(.system(size: 11)).foregroundStyle(.secondary)
             TextField("Add a caption…", text: $draft, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder).focused($focused)
             HStack {
-                Button("Use default") { store.setLabelCaption(labelID, caption: ""); dismiss() }.buttonStyle(.plain).foregroundStyle(.secondary)
+                Button("Use default") { store.setLabelCaption(labelID, caption: ""); dismiss() }.buttonStyle(.tempo).foregroundStyle(.secondary)
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Save") { store.setLabelCaption(labelID, caption: draft); dismiss() }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)

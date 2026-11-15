@@ -1,89 +1,71 @@
 # Tempo
 
-A native, local-first Mac task app. SwiftUI, no browser or task-data server. Sparkle handles app updates. Requires macOS 14+ and Swift 6 command line tools (full Xcode is optional).
+A native, local-first Mac task app. SwiftUI, no browser or task-data server. Sparkle handles app updates. Requires macOS 14+ and Swift 6 command line tools; full Xcode is optional for local development.
 
 ## Download
 
-[Download Tempo for Mac (.dmg)](https://github.com/AyaanIqbal/tempo/releases/latest/download/Tempo.dmg). Open the disk image and drag Tempo to Applications. Requires macOS 14 or later; supports Apple Silicon and Intel. This early build is not yet notarized by Apple.
+[Download Tempo for Mac (.dmg)](https://github.com/AyaanIqbal/tempo/releases/latest/download/Tempo.dmg). Open the disk image and drag Tempo to Applications. Supports Apple Silicon and Intel. Public releases may lag the latest source; early builds are not yet notarized by Apple.
 
-## Run
+## Run and build
 
 ```sh
 swift run Tempo
-```
-
-Build a standalone app, then open it:
-
-```sh
 ./scripts/build-app.sh
 open build/Tempo.app
 ```
 
-The app is ad-hoc signed for local development. Distribution and notarization are not configured.
+## Tasks, notes, and subtasks in one place
 
-## Test
+Start with a plain task list. Optional labels, dates, priorities, and status columns stay out of the way until you enable them. Click a task or press Enter to expand its notes and properties directly in the list and immediately type in its Markdown notes. There is no right-hand detail pane. Board cards also expand in place.
+
+- **Enter while composing:** save the task.
+- **Shift-Enter while composing:** save the parent and start its first subtask directly underneath.
+- **Shift-Enter on a selected task** or **Command-Shift-N:** add a subtask beneath it without opening its notes.
+- **Enter in the inline subtask field:** add a sibling and keep entering subtasks under the same parent.
+- **Shift-Enter in that field:** save the child and start a nested subtask beneath it.
+- **Escape:** finish inline entry or notes and return to task navigation. Repeated Escape moves to the sidebar and then All tasks, where it stays. Unfinished drafts and saved notes are preserved.
+- Use the row's **+** button for subtasks or its **notes** button for notes; **Command-Shift-M** also opens notes.
+
+Notes save automatically as Markdown text. Bullets, nested bullets, numbered lists, and task checkboxes continue automatically on Enter; Enter on an empty list item exits the list. Command-B and Command-I insert bold/italic Markdown. The toolbar adds bold, italic, headings, and bullet lists; Preview renders them. Existing notes remain unchanged. Properties expand separately below notes.
+
+Completing a parent completes unfinished descendants. Resolving all children completes the parent. Reopening a child reopens resolved ancestors. Cancellation requires a reason and propagates only to unfinished descendants; canceled children count as resolved.
+
+## Views and statuses
+
+All tasks includes unlabeled tasks; Today shows work due today. Labels can nest to any depth and use paths such as `Work > Edge Security > Backend`. A task has one label path; subtasks inherit it. The sidebar counts only open tasks (To do and In progress), including descendants within a label branch.
+
+**To do and Completed are the default main statuses.** Enable In progress in **Tempo → Settings** (Command-comma). Disabling it leaves saved statuses intact: existing in-progress work appears under To do until re-enabled. Canceled remains available as an explicit task action, and gets a board column when canceled work exists.
+
+Click a status summary card to filter the current view. Click the selected card again to restore that view's default list. Counts stay scoped to the label branch, Today, or All tasks. Completed tasks remain visible by default and sort after open work.
+
+List and Board have separate property visibility settings. Property controls are on the right of the toolbar, search is in the middle, and the view selector is on the left. Importance labels have numeric weights: None 0, Low 1, Medium 2, High 3, Urgent 4.
+
+## Keyboard navigation and smart entry
+
+Use Up/Down in the sidebar to choose All tasks, Today, or a label. Right always focuses new-task entry, whether or not the current view has tasks. While that field is empty, Left returns to the sidebar and Down selects the first visible task (or stays in entry if there are none). With text present, arrows retain their normal editing behavior. Up/Down navigates visible tasks and subtasks; Left returns to the sidebar. Click branch chevrons to collapse or expand them. Control-Command-S focuses the sidebar.
+
+Command-K opens an immediate floating command/search popup. Search label paths or tasks, navigate with arrows, and press Enter. Escape, outside-click, or Command-K dismisses it. Breadcrumb parents are clickable.
+
+Type `work`, press Tab to apply the Work label, then type the task title. Tab applies smart-entry suggestions; Shift-Tab dismisses them. Suggestions on saved tasks remain available until explicitly dismissed. Dismissals persist per task. Normal Tab navigation is preserved when no suggestion is available.
+
+Text editing takes precedence over task shortcuts. Shift-Command-Delete deletes a selected task outside text editing; Command-Delete retains native text deletion. Command-Z uses native text undo. Option-Command-Z undoes the last workspace change outside text editing. Help → Tempo Keyboard Shortcuts lists the other shortcuts.
+
+## Local data, appearance, and releases
+
+Data lives in `~/Library/Application Support/Tempo/workspace.json`, independently of the repo. File → Export Backup creates a portable JSON copy. Restore confirms replacement and supports session undo. Invalid data is preserved rather than overwritten. Keep regular backups. There is no task sync, account, or analytics.
+
+Choose System, Light, or Dark from Appearance or Settings. Your appearance and optional In progress preference are saved on this Mac. Label captions are editable in their views and are included in backups.
+
+The app icon is in `Assets/Tempo.icns`, with PNG preview and editable SVG beside it. `./scripts/generate-icon.sh` regenerates the icon sizes. See [Releasing Tempo](docs/RELEASING.md) for GitHub draft releases, signed updates, DMG packaging, and optional Apple notarization. Build scripts do not commit or push.
+
+## Checks
 
 ```sh
 swift run TempoChecks
+./scripts/check-interactions.sh
+python3 Tests/release_checks.py
 ```
 
-## Features
+These run model and interaction checks using temporary workspaces, including nested subtasks, active counts, status filters, optional status persistence, saved notes, label safety, and shortcuts. They do not edit your real tasks. Hands-on UI review is still needed for visual layout and keyboard focus behavior.
 
-- Start with an empty task list. No mandatory labels, dates, or priorities.
-- Nested subtasks: completing a parent resolves unfinished descendants; resolving every child completes the parent. Reopening a child reopens resolved ancestors. Reopening a parent preserves its children's states.
-- Cancellation requires a reason and propagates to unfinished descendants. Existing completed/canceled tasks are preserved. Canceled children count as resolved.
-- Arbitrarily nested labels, one label path per task. Subtasks inherit their parent's path.
-- Expandable IDE-style label explorer: + at the top creates a root label; + on a row creates a sub-label; right-click for siblings. Return saves an inline label, Escape cancels.
-- Prefix matching suggests existing labels; accepting the suggestion removes the prefix. Matches never silently change a task. Ambiguous names show separate path suggestions.
-- Importance: None (0), Low (1), Medium (2), High (3), Urgent (4). Optional sort by weight. None means unassigned. Parent importance is independent.
-- Optional due dates and notes; independent dates on subtasks.
-- List and status board, with drag and drop. Display properties saved separately for list and board.
-- Mac menu shortcuts and searchable command menu with Up/Down selection, Return to execute, and automatic scrolling. See Help → Tempo Keyboard Shortcuts.
-- Full-width sidebar navigation targets, including the padding around labels.
-- Labels use simple dot markers. Right-click a label to rename, move, or remove it directly in the sidebar.
-- Property controls sit on the right of the toolbar, with search in the middle and the view selector on the left. Click Labels, Importance, Due date, or Status directly to show/hide them. Settings stay independent for list and board. Completed tasks stay visible; status ordering puts in-progress work first and completed work last.
-- Automatic local JSON saving, atomic writes, export/restore, and session undo for deletions and edits.
-
-## Data
-
-Data lives in `~/Library/Application Support/Tempo/workspace.json`, independently of the repository location. File → Export Backup creates a portable JSON copy. Restore replaces the workspace after confirmation and supports session undo. Invalid data is preserved instead of overwritten; restore a valid backup to recover.
-
-There is no task sync, account, or analytics. Release builds contact the public GitHub update feed through Sparkle. Keep regular backups. Undo stores the last workspace change; workspace undo includes edits to text fields. UI behavior still needs hands-on review. Removing a label moves its directly assigned tasks and child labels to its parent (or the top level/Inbox), and supports session undo.
-
-No commits or pushes are made by the build scripts.
-
-The checks use a standalone executable so they also run with Apple Command Line Tools installations that do not include the XCTest/Testing modules.
-
-## Downloads and updates
-
-See [Releasing Tempo](docs/RELEASING.md) for versioning, signed update packaging, GitHub Actions releases, and optional Apple notarization. The release workflow creates a draft for review; publishing it makes the stable download and update feed point to that release. Initial setup and a real two-version update test are required before calling distribution complete.
-
-## Navigating your workspace
-
-Click a sidebar view and use Up/Down to move through All tasks, Inbox, Today, and visible labels. Left collapses a branch or moves to its parent. Right enters the task list. Click a branch chevron to expand it. Use Control-Command-S to focus the sidebar from the keyboard. Editing text keeps normal arrow-key behavior. Press Escape from task entry to highlight the selected/newly created task, without clearing unfinished text. Search and task details/notes return to the sidebar on Escape.
-
-Command-K searches label paths and tasks as well as commands. Select a label result to open its view (collapsed ancestors expand automatically), or a task result to open its details. Breadcrumbs show the complete workspace/label/sub-label path, with clickable parents.
-
-All tasks keeps its original caption. Inbox and Today have their own descriptions. Click the caption or pencil on any label view to customize it; Use default resets it. Captions are stored with labels, included in backups, and old data without captions still loads.
-
-## Task selection and quick entry
-
-Creating a task highlights it without opening the detail pane. New tasks appear first. Escape leaves quick entry at that selected task; Up/Down moves through visible tasks and subtasks. Left returns to the sidebar, and Right from the sidebar enters tasks. Enter, Right from a selected task, or clicking an existing task opens details. Shift-Enter (or Command-Shift-N) starts a subtask of the selected task in the composer.
-
-Completed tasks are visible by default; completed work stays visible below open tasks. Subtasks appear as nested rows and can be collapsed. Label counts include all tasks and inherited subtasks within the entire label branch, including completed/canceled tasks.
-
-Smart-entry matches are applied with Tab while typing or while a task is selected. Shift-Tab dismisses the suggestion; it never applies it. When no suggestion is available, Tab and Shift-Tab keep their normal focus-navigation behavior. Unaccepted suggestions appear next to a selected task, including after selecting it again later; Dismiss is stored per task. Accepting a suggestion assigns its label and removes its prefix from the title. Subtasks inherit labels, so their titles are not parsed into independent label paths.
-
-The label property opens a searchable, indented hierarchy instead of a flat menu. Search by label name or any parent in the path; Up/Down and Enter work in the chooser.
-
-Run `./scripts/check-interactions.sh` to verify selection versus explicit opening, new-task order, subtask navigation, completed visibility, smart matching, and persisted workspace data using a temporary workspace (not your real tasks).
-
-Summary cards count only the current view: all work in All tasks, unlabeled work in Inbox, due-today work in Today, and the full current label branch in label views. Task order is In progress, To do, Done, then Canceled; optional priority sorting applies within each status. Nested tasks follow the same ordering within their parent. Moving between sidebar and task list transfers the highlight to the active region while remembering the selected task.
-
-Text editing takes precedence over task shortcuts. Completion, status/importance changes, task deletion, and task navigation shortcuts are disabled while editing text. Task deletion uses Shift-Command-Delete; Command-Delete stays available for native text deletion. Command-Z uses native text undo; Option-Command-Z undoes the last workspace change outside text editing.
-
-## Appearance
-
-Choose System, Light, or Dark from the Appearance menu or Tempo → Settings (Command-comma). System is the default and follows macOS. The preference is saved on this Mac and applies to the main window, popovers, dialogs, and native controls. Dark mode uses a lighter accent for readable text and controls.
-
-The Command-K menu appears immediately as a floating overlay, with Escape, outside-click, or Command-K to close it. Actions run without a dismissal delay. The app icon is in `Assets/Tempo.icns`, with a 1024px PNG preview and editable SVG source beside it. Run `./scripts/generate-icon.sh` to rebuild all icon sizes; app packaging embeds the ICNS automatically.
+Clickable controls have hover and pressed feedback, and task rows highlight on hover. Markdown notes have native text editing and literal punctuation: smart quotes and dash substitution are disabled so Markdown markers stay intact.

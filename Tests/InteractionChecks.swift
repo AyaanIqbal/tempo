@@ -5,7 +5,10 @@ import TempoCore
     @MainActor static func main() throws {
         let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: temporary) }
-        let store = Store(fileURL: temporary.appending(path: "workspace.json"))
+        let suite = "TempoChecks-" + UUID().uuidString
+        let preferences = UserDefaults(suiteName: suite)!
+        defer { preferences.removePersistentDomain(forName: suite) }
+        let store = Store(fileURL: temporary.appending(path: "workspace.json"), preferences: preferences)
         let first = store.add("First task")!
         let second = store.add("Second task")!
         precondition(store.selectedID == second && store.inspectorID == nil, "Creation must not open task details")
@@ -36,12 +39,12 @@ import TempoCore
         precondition(store.scopedTasks.map(\.id) == [smart], "A label summary must exclude unrelated tasks")
         store.openScope(parentLabel.uuidString)
         precondition(Set(store.scopedTasks.map(\.id)) == Set([smart, direct]), "Parent summaries include child-label tasks")
-        store.openScope("inbox")
-        precondition(store.scopedTasks.allSatisfy { store.workspace.effectiveLabel($0) == nil })
         store.edit(other) { $0.dueDate = Date() }
         store.openScope("today")
         precondition(store.scopedTasks.map(\.id) == [other], "Today summarizes today's due tasks")
         store.openScope("all")
+        precondition(!store.showInProgress && !store.availableStatuses.contains(.inProgress), "In progress is opt-in")
+        store.showInProgress = true
         store.status(smart, .inProgress)
         precondition(store.roots.first?.id == smart, "In-progress tasks precede newer To do tasks")
         precondition(store.roots.last?.id == first, "Completed tasks belong below open work")
@@ -60,7 +63,74 @@ import TempoCore
         store.toggleProperty(\.importance)
         store.viewMode = .list
         precondition(store.properties.labels && !store.properties.importance)
-        let loaded = Store(fileURL: temporary.appending(path: "workspace.json"))
+        // Status cards toggle a filter in-place and never change the label scope.
+        store.openScope(parentLabel.uuidString)
+        store.toggleStatusFilter(.inProgress)
+        precondition(store.statusFilter == .inProgress && store.scope == parentLabel.uuidString)
+        precondition(store.taskRows.map(\.id) == [smart])
+        store.toggleStatusFilter(.inProgress)
+        precondition(store.statusFilter == nil && Set(store.taskRows.map(\.id)) == Set([smart, direct]))
+        let withProgress = Store(fileURL: temporary.appending(path: "workspace.json"), preferences: preferences)
+        precondition(withProgress.showInProgress, "Enabled In progress preference must persist")
+        store.showInProgress = false
+        precondition(store.displayStatus(store.workspace.tasks.first { $0.id == smart }!) == .todo)
+        precondition(store.summaryCount(.todo) == 2)
+        precondition(store.workspace.tasks.first { $0.id == smart }?.status == .inProgress, "Disabling a status must preserve its saved value")
+        store.toggleStatusFilter(.todo)
+        precondition(Set(store.taskRows.map(\.id)) == Set([smart, direct]))
+        store.toggleStatusFilter(.todo)
+        precondition(store.statusFilter == nil)
+        store.openScope("all")
+        store.toggleStatusFilter(.done)
+        precondition(store.taskRows.allSatisfy { $0.task.status == .done })
+        store.toggleStatusFilter(.done)
+        let parent = store.add("Parent created from composer")!
+        store.beginInlineSubtask(of: parent)
+        store.inlineSubtaskDraft = "Child one"
+        let childOne = store.submitInlineSubtask()!
+        store.inlineSubtaskDraft = "Child two"
+        let childTwo = store.submitInlineSubtask(nest: true)!
+        precondition(store.workspace.tasks.first { $0.id == childOne }?.parentID == parent)
+        precondition(store.workspace.tasks.first { $0.id == childTwo }?.parentID == parent)
+        precondition(store.inlineSubtaskParent == childTwo)
+        store.inlineSubtaskDraft = "Grandchild"
+        let grandchild = store.submitInlineSubtask()!
+        precondition(store.workspace.tasks.first { $0.id == grandchild }?.parentID == childTwo)
+        precondition(store.inspectorID == nil, "Inline subtask entry never needs a detail pane")
+        store.edit(parent) { $0.notes = "## Heading\n- **Important** step\n- Another step" }
+        store.editNotes(parent)
+        precondition(store.inspectorID == parent && store.focusNotesID == parent && store.viewMode == .list)
+        store.closeInspector()
+        precondition(!store.workspace.sidebarScopes().contains("inbox"))
+        // Right from the sidebar requests creation, regardless of existing tasks.
+        store.openScope(parentLabel.uuidString)
+        store.selectedID = smart
+        let request = store.focusComposer
+        store.requestNewTask()
+        precondition(store.focusComposer != request && store.activeRegion == .editor && store.inspectorID == nil)
+        store.openTask(smart)
+        precondition(store.focusNotesID == smart && store.activeRegion == .editor)
+        let notesRequest = store.notesFocusRequest
+        store.openTask(smart)
+        precondition(store.notesFocusRequest != notesRequest, "Reopening an expanded task must focus notes again")
+        let savedNotes = store.workspace.tasks.first { $0.id == parent }!.notes
+        store.navigateBack()
+        precondition(store.inspectorID == nil && store.activeRegion == .tasks)
+        store.navigateBack()
+        precondition(store.activeRegion == .sidebar && store.scope == parentLabel.uuidString)
+        store.navigateBack()
+        precondition(store.scope == "all" && store.activeRegion == .sidebar)
+        store.navigateBack()
+        precondition(store.scope == "all", "Escape at home is idempotent")
+        precondition(store.workspace.tasks.first { $0.id == parent }!.notes == savedNotes)
+        store.beginInlineSubtask(of: parent)
+        store.inlineSubtaskDraft = "Unfinished thought"
+        store.navigateBack()
+        store.beginInlineSubtask(of: parent)
+        precondition(store.inlineSubtaskDraft == "Unfinished thought", "Escape must not discard an unfinished subtask draft")
+        store.navigateBack()
+        let loaded = Store(fileURL: temporary.appending(path: "workspace.json"), preferences: preferences)
+        precondition(!loaded.showInProgress, "Status preference persists independently of task data")
         precondition(loaded.workspace == store.workspace, "Selection changes must not lose saved task data")
         print("Interaction checks passed: creation, explicit open, task navigation, subtasks, completed visibility, smart entry, scoped summaries, status sorting, focus highlights, per-view properties, and persistence.")
     }

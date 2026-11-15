@@ -10,7 +10,7 @@ struct SmartSuggestionCard: View {
                 Text("Suggested label").font(.system(size: 10)).foregroundStyle(.secondary)
                 ForEach(store.workspace.smartMatches(for: task)) { label in
                     HStack {
-                        Button(store.workspace.labelPath(label.id).map(\.name).joined(separator: " / ")) {
+                        Button(store.workspace.labelPath(label.id).map(\.name).joined(separator: " > ")) {
                             store.acceptSuggestion(task: task.id, label: label.id)
                             NotificationCenter.default.post(name: .focusTasks, object: nil)
                         }.buttonStyle(.bordered)
@@ -21,7 +21,7 @@ struct SmartSuggestionCard: View {
                 Button("Dismiss · ⇧Tab") {
                     store.edit(task.id) { $0.smartEntryDismissed = true }
                     NotificationCenter.default.post(name: .focusTasks, object: nil)
-                }.buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)
+                }.buttonStyle(.tempo).font(.system(size: 10)).foregroundStyle(.secondary)
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.accent.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
         }
     }

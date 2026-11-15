@@ -72,7 +72,6 @@ print("Passed label editing/tree checks (6 groups total).")
 func captionsAndLegacyLabels() throws {
     var workspace = Workspace()
     precondition(workspace.viewCaption(for: "all") == "Make room for what matters.")
-    precondition(workspace.viewCaption(for: "inbox").contains("Unlabelled"))
     precondition(workspace.viewCaption(for: "today").contains("today"))
     let school = try workspace.addLabel(name: "School")
     let work = try workspace.addLabel(name: "Work")
@@ -96,7 +95,7 @@ func sidebarOrderAndBreadcrumbs() throws {
     let school = try workspace.addLabel(name: "School")
     let ai = try workspace.addLabel(name: "AI Sec", parent: work)
     let nested = try workspace.addLabel(name: "Research", parent: ai)
-    precondition(workspace.sidebarScopes() == ["all", "inbox", "today", work.uuidString, ai.uuidString, nested.uuidString, school.uuidString])
+    precondition(workspace.sidebarScopes() == ["all", "today", work.uuidString, ai.uuidString, nested.uuidString, school.uuidString])
     precondition(workspace.adjacentScope(to: work.uuidString, offset: 1) == ai.uuidString)
     precondition(workspace.adjacentScope(to: work.uuidString, offset: 1, collapsed: [work]) == school.uuidString)
     precondition(workspace.adjacentScope(to: "all", offset: -1) == "all")
@@ -116,6 +115,7 @@ func rolledUpCountsAndVisibleSubtasks() throws {
     let child = w.addTask(title: "AI child", parent: a)!
     precondition(w.taskCount(in: ai) == 2 && w.taskCount(in: work) == 5)
     try w.setStatus(b, to: .done)
+    precondition(w.taskCount(in: edge) == 1 && w.taskCount(in: work) == 4, "Sidebar counts exclude completed tasks")
     let roots = w.tasks.filter { $0.parentID == nil }
     precondition(w.taskRows(roots: roots).contains { $0.id == b })
     precondition(w.taskRows(roots: roots).first { $0.id == child }?.depth == 1)
@@ -154,3 +154,16 @@ func labelFirstEntry() throws {
 }
 try labelFirstEntry()
 print("Label-first smart-entry checks passed (11 groups total).")
+
+func markdownJotNotes() {
+    precondition(MarkdownEditing.newline(after: "- First point").insertion == "\n- ")
+    precondition(MarkdownEditing.newline(after: "  - Nested point").insertion == "\n  - ")
+    precondition(MarkdownEditing.newline(after: "9. Ninth").insertion == "\n10. ")
+    precondition(MarkdownEditing.newline(after: "- [x] Finished").insertion == "\n- [ ] ")
+    precondition(MarkdownEditing.newline(after: "- ").insertion.isEmpty)
+    precondition(MarkdownEditing.newline(after: "- ").removeBeforeCursor == 2)
+    precondition(MarkdownEditing.newline(after: "Plain text").insertion == "\n")
+    precondition(MarkdownEditing.newline(after: "- café 🧠").insertion == "\n- ")
+}
+markdownJotNotes()
+print("Markdown jot-note continuation and empty-list exit checks passed (12 groups total).")

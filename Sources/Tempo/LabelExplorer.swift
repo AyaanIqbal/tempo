@@ -17,7 +17,7 @@ struct LabelExplorer: View {
                 Text("LABELS").font(.system(size: 10, weight: .semibold)).tracking(1.7).foregroundStyle(.tertiary)
                 Spacer()
                 Button { beginAdding(parent: nil) } label: { Image(systemName: "plus").frame(width: 26, height: 26).contentShape(Rectangle()) }.help("New top-level label")
-            }.buttonStyle(.plain).foregroundStyle(.secondary).padding(.leading, 12).padding(.trailing, 3)
+            }.buttonStyle(.tempo).foregroundStyle(.secondary).padding(.leading, 12).padding(.trailing, 3)
             ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
@@ -41,13 +41,13 @@ struct LabelExplorer: View {
         return HStack(spacing: 0) {
             Button {
                 if store.collapsedLabels.contains(row.id) { store.collapsedLabels.remove(row.id) } else { store.collapsedLabels.insert(row.id) }
-            } label: { Image(systemName: store.collapsedLabels.contains(row.id) ? "chevron.right" : "chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary).frame(width: 20, height: 32).contentShape(Rectangle()) }.buttonStyle(.plain).disabled(!hasChildren).opacity(hasChildren ? 1 : 0)
+            } label: { Image(systemName: store.collapsedLabels.contains(row.id) ? "chevron.right" : "chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary).frame(width: 20, height: 32).contentShape(Rectangle()) }.buttonStyle(.tempo).disabled(!hasChildren).opacity(hasChildren ? 1 : 0)
             Button { selection = row.id } label: {
                 HStack(spacing: 8) { Circle().fill(Color.accent.opacity(0.65)).frame(width: 6, height: 6); Text(row.label.name).lineLimit(1); Spacer(minLength: 0)
                     let count = store.workspace.taskCount(in: row.id)
                     if count > 0 { Text("\(count)").font(.system(size: 10)).monospacedDigit().foregroundStyle(.secondary).padding(.trailing, 5).accessibilityLabel("\(count) tasks in this label and its sub-labels") } }.font(.system(size: 12)).frame(maxWidth: .infinity, minHeight: 34, alignment: .leading).contentShape(Rectangle())
-            }.buttonStyle(.plain)
-            Button { beginAdding(parent: row.id) } label: { Image(systemName: "plus").font(.system(size: 10)).foregroundStyle(.secondary).frame(width: 27, height: 34).contentShape(Rectangle()) }.buttonStyle(.plain).help("New sub-label inside \(row.label.name)")
+            }.buttonStyle(.tempo)
+            Button { beginAdding(parent: row.id) } label: { Image(systemName: "plus").font(.system(size: 10)).foregroundStyle(.secondary).frame(width: 27, height: 34).contentShape(Rectangle()) }.buttonStyle(.tempo).help("New sub-label inside \(row.label.name)")
         }
         .padding(.leading, CGFloat(row.depth) * 14)
         .background(selection == row.id && store.activeRegion == .sidebar ? Color.accent.opacity(0.11) : .clear, in: RoundedRectangle(cornerRadius: 6))
@@ -60,19 +60,19 @@ struct LabelExplorer: View {
             Menu("Move to") {
                 Button("Top level") { store.updateLabel(row.id, name: row.label.name, parent: nil) }
                 ForEach(store.workspace.labelRows().filter { $0.id != row.id && !store.workspace.labelDescendants(of: row.id).contains($0.id) }) { destination in
-                    Button(store.workspace.labelPath(destination.id).map(\.name).joined(separator: " / ")) { store.updateLabel(row.id, name: row.label.name, parent: destination.id) }
+                    Button(store.workspace.labelPath(destination.id).map(\.name).joined(separator: " > ")) { store.updateLabel(row.id, name: row.label.name, parent: destination.id) }
                 }
             }
             Button("Remove label…", role: .destructive) { removing = row.id }
         }
-        .help(store.workspace.labelPath(row.id).map(\.name).joined(separator: " / "))
+        .help(store.workspace.labelPath(row.id).map(\.name).joined(separator: " > "))
     }
     private func editor(depth: Int) -> some View {
         HStack(spacing: 6) {
             Circle().fill(Color.accent.opacity(0.65)).frame(width: 6, height: 6)
             TextField("Label name", text: $draft).textFieldStyle(.roundedBorder).focused($editing).onSubmit(create)
                 .onKeyPress(.escape) { adding = false; renaming = nil; draft = ""; return .handled }
-            Button(action: create) { Image(systemName: "return").frame(width: 20, height: 28).contentShape(Rectangle()) }.buttonStyle(.plain).disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button(action: create) { Image(systemName: "return").frame(width: 20, height: 28).contentShape(Rectangle()) }.buttonStyle(.tempo).disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }.font(.system(size: 11)).padding(.leading, 20 + CGFloat(depth) * 14).padding(.vertical, 4)
     }
     private func beginAdding(parent: UUID?) {

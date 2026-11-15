@@ -55,7 +55,6 @@ public extension Workspace {
 public extension Workspace {
     func viewCaption(for scope: String) -> String {
         switch scope {
-        case "inbox": return "Unlabelled tasks, ready to find their place."
         case "today": return "Focus on what's due today."
         case "all": return "Make room for what matters."
         default:
@@ -68,7 +67,7 @@ public extension Workspace {
 
 public extension Workspace {
     func sidebarScopes(collapsed: Set<UUID> = []) -> [String] {
-        ["all", "inbox", "today"] + labelRows(collapsed: collapsed).map { $0.id.uuidString }
+        ["all", "today"] + labelRows(collapsed: collapsed).map { $0.id.uuidString }
     }
     func adjacentScope(to current: String, offset: Int, collapsed: Set<UUID> = []) -> String {
         let scopes = sidebarScopes(collapsed: collapsed)
@@ -84,7 +83,7 @@ public struct TaskTreeRow: Identifiable, Sendable {
 }
 public extension Workspace {
     func taskCount(in label: UUID) -> Int {
-        tasks.filter { labelPath(effectiveLabel($0)).contains { $0.id == label } }.count
+        tasks.filter { !$0.status.isResolved && labelPath(effectiveLabel($0)).contains { $0.id == label } }.count
     }
     func taskRows(roots: [TaskItem], collapsed: Set<UUID> = [], showResolved: Bool = true, depth: Int = 0, byImportance: Bool = false) -> [TaskTreeRow] {
         sortedTasks(roots, byImportance: byImportance).flatMap { task in

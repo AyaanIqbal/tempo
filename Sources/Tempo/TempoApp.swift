@@ -21,12 +21,13 @@ import TempoCore
             UpdateCommands(manager: updates)
             CommandGroup(replacing: .newItem) {
                 Button("New Task") { store.focusComposer = UUID() }.keyboardShortcut("n")
+                Button("Edit Task Notes") { if let id = store.selectedID, store.canUseTaskShortcuts { store.editNotes(id) } }.keyboardShortcut("m", modifiers: [.command, .shift]).disabled(!store.canUseTaskShortcuts)
                 Button("New Subtask") { if store.canUseTaskShortcuts { NotificationCenter.default.post(name: .newSubtask, object: nil) } }.keyboardShortcut("n", modifiers: [.command, .shift]).disabled(!store.canUseTaskShortcuts)
             }
             CommandGroup(after: .undoRedo) { Button("Undo Last Task Change") { if !store.isEditingText { store.undo() } }.keyboardShortcut("z", modifiers: [.command, .option]).disabled(store.undoWorkspace == nil || store.isEditingText) }
             CommandMenu("Task") {
                 Button("Complete / Reopen") { if store.canUseTaskShortcuts, let id = store.selectedID { store.toggle(id) } }.keyboardShortcut(.return).disabled(!store.canUseTaskShortcuts)
-                ForEach(TaskStatus.allCases, id: \.self) { status in Button(status.rawValue) { if store.canUseTaskShortcuts, let id = store.selectedID { store.status(id, status) } }.disabled(!store.canUseTaskShortcuts) }
+                ForEach(store.availableStatuses, id: \.self) { status in Button(status.rawValue) { if store.canUseTaskShortcuts, let id = store.selectedID { store.status(id, status) } }.disabled(!store.canUseTaskShortcuts) }
                 Divider()
                 ForEach(Importance.allCases, id: \.self) { priority in Button("Importance: \(priority.title)") { if store.canUseTaskShortcuts, let id = store.selectedID { store.edit(id) { $0.importance = priority } } }.keyboardShortcut(KeyEquivalent(Character(String(priority.rawValue))), modifiers: [.command, .option]).disabled(!store.canUseTaskShortcuts) }
                 Divider()
@@ -53,7 +54,7 @@ import TempoCore
             }
             CommandGroup(replacing: .help) { Button("Tempo Keyboard Shortcuts") { store.showHelp = true }.keyboardShortcut("/", modifiers: .command) }
         }
-        Settings { AppearanceSettings().tint(Color.accent) }
+        Settings { AppearanceSettings(store: store).tint(Color.accent) }
     }
 }
 extension Notification.Name {
