@@ -129,6 +129,20 @@ import TempoCore
         store.beginInlineSubtask(of: parent)
         precondition(store.inlineSubtaskDraft == "Unfinished thought", "Escape must not discard an unfinished subtask draft")
         store.navigateBack()
+        // Exercise the warmed display cache across filter and workspace mutations.
+        store.openScope(parentLabel.uuidString)
+        store.search = "cached child"
+        precondition(store.taskRows.isEmpty)
+        let cachedChild = store.add("Cached child", parent: direct)!
+        precondition(store.taskRows.map(\.id) == [direct, cachedChild], "Editing the workspace invalidates cached search results and retains matching ancestors")
+        store.collapsedTasks.insert(direct)
+        precondition(store.taskRows.map(\.id) == [direct])
+        store.collapsedTasks.remove(direct)
+        store.search = ""
+        let beforeCompletion = store.openTaskCount(in: parentLabel)
+        store.status(cachedChild, .done)
+        precondition(store.openTaskCount(in: parentLabel) == beforeCompletion - 2, "Completing a child and its parent updates cached rollups")
+        precondition(store.summaryCount(.done) >= 2)
         let loaded = Store(fileURL: temporary.appending(path: "workspace.json"), preferences: preferences)
         precondition(!loaded.showInProgress, "Status preference persists independently of task data")
         precondition(loaded.workspace == store.workspace, "Selection changes must not lose saved task data")

@@ -8,7 +8,7 @@ struct InlineTaskEditor: View {
     let taskID: UUID
     @State private var preview = false
     @FocusState private var notesFocused: Bool
-    private var task: TaskItem? { store.workspace.tasks.first { $0.id == taskID } }
+    private var task: TaskItem? { store.task(taskID) }
     private func field<T>(_ path: WritableKeyPath<TaskItem, T>, fallback: T) -> Binding<T> {
         Binding(get: { task?[keyPath: path] ?? fallback }, set: { value in store.edit(taskID) { $0[keyPath: path] = value } })
     }

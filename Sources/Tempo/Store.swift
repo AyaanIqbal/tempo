@@ -7,8 +7,65 @@ enum NavigationRegion: Hashable { case sidebar, tasks, editor }
 
 enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
 
+private struct TaskIndex {
+    let byID: [UUID: TaskItem]
+    let children: [UUID?: [TaskItem]]
+    var labelPaths: [UUID: [TaskLabel]] = [:]
+    var taskLabels: [UUID: UUID] = [:]
+    var openCounts: [UUID: Int] = [:]
+
+    init(_ workspace: Workspace) {
+        byID = Dictionary(uniqueKeysWithValues: workspace.tasks.map { ($0.id, $0) })
+        children = Dictionary(grouping: workspace.tasks, by: \.parentID)
+        for label in workspace.labels { labelPaths[label.id] = workspace.labelPath(label.id) }
+        var pending = children[nil] ?? []
+        while let task = pending.popLast() {
+            let label = task.parentID.flatMap { taskLabels[$0] } ?? (task.parentID == nil ? task.labelID : nil)
+            if let label {
+                taskLabels[task.id] = label
+                if !task.status.isResolved {
+                    for ancestor in labelPaths[label] ?? [] { openCounts[ancestor.id, default: 0] += 1 }
+                }
+            }
+            pending.append(contentsOf: children[task.id] ?? [])
+        }
+    }
+}
+
+private struct TaskDisplayKey: Equatable {
+    let scope: String
+    let search: String
+    let status: TaskStatus?
+    let showResolved: Bool
+    let showInProgress: Bool
+    let byImportance: Bool
+    let collapsed: Set<UUID>
+    let today: Date?
+}
+
+private struct TaskDisplay {
+    let key: TaskDisplayKey
+    let scoped: [TaskItem]
+    let ids: Set<UUID>
+    let roots: [TaskItem]
+    let rows: [TaskTreeRow]
+    let counts: [TaskStatus: Int]
+    let columns: [TaskStatus: [TaskItem]]
+}
+
 @MainActor @Observable final class Store {
-    var workspace = Workspace()
+    var workspace = Workspace() {
+        didSet { cachedIndex = nil; cachedDisplay = nil }
+    }
+    @ObservationIgnored private var cachedIndex: TaskIndex?
+    @ObservationIgnored private var cachedDisplay: TaskDisplay?
+    private var taskIndex: TaskIndex {
+        let current = workspace // Observe workspace changes even on cache hits.
+        if let cachedIndex { return cachedIndex }
+        let index = TaskIndex(current)
+        cachedIndex = index
+        return index
+    }
     var activeRegion: NavigationRegion = .sidebar
     var selectedID: UUID?
     var inspectorID: UUID?
@@ -55,42 +112,87 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
             }
         } catch { loadFailed = true; message = "Could not read your saved workspace. Your data has been preserved. Restore a backup or fix the data file before editing. \(error.localizedDescription)" }
     }
-    var selected: TaskItem? { workspace.tasks.first { $0.id == selectedID } }
+    var selected: TaskItem? { selectedID.flatMap { task($0) } }
     var isEditingText: Bool {
         if let editor = NSApp?.keyWindow?.firstResponder as? NSTextView, editor.isEditable { return true }
         if let field = NSApp?.keyWindow?.firstResponder as? NSTextField, field.isEditable { return true }
         return activeRegion == .editor
     }
     var canUseTaskShortcuts: Bool { selectedID != nil && activeRegion == .tasks && !isEditingText }
-    var inspected: TaskItem? { workspace.tasks.first { $0.id == inspectorID } }
-    var taskRows: [TaskTreeRow] { workspace.taskRows(roots: roots, collapsed: collapsedTasks, showResolved: board || showResolved, byImportance: sortByImportance).filter { visibleTaskIDs.contains($0.id) } }
+    var inspected: TaskItem? { inspectorID.flatMap { task($0) } }
+    func task(_ id: UUID) -> TaskItem? { taskIndex.byID[id] }
+    func children(of id: UUID) -> [TaskItem] { taskIndex.children[id] ?? [] }
+    func openTaskCount(in label: UUID) -> Int { taskIndex.openCounts[label, default: 0] }
+    func labelPath(forTask id: UUID) -> [TaskLabel] {
+        let index = taskIndex
+        return index.taskLabels[id].flatMap { index.labelPaths[$0] } ?? []
+    }
+    var taskRows: [TaskTreeRow] { taskDisplay.rows }
     var properties: ViewProperties { board ? workspace.boardProperties : workspace.listProperties }
-    var scopedTasks: [TaskItem] {
-        workspace.tasks.filter { task in
-            scope == "all"
-            || (scope == "today" && task.dueDate.map { Calendar.current.isDateInToday($0) } == true)
-            || workspace.labelPath(workspace.effectiveLabel(task)).contains { $0.id.uuidString == scope }
-        }
-    }
-    var visibleTaskIDs: Set<UUID> {
-        var ids: Set<UUID> = []
-        for task in scopedTasks {
-            guard statusFilter == nil || displayStatus(task) == statusFilter else { continue }
-            guard search.isEmpty || task.title.localizedCaseInsensitiveContains(search) || task.notes.localizedCaseInsensitiveContains(search) else { continue }
-            guard showResolved || !task.status.isResolved || board else { continue }
-            ids.insert(task.id)
-            var parent = task.parentID
-            while let id = parent { ids.insert(id); parent = workspace.tasks.first { $0.id == id }?.parentID }
-        }
-        return ids
-    }
-    var roots: [TaskItem] {
-        workspace.sortedTasks(workspace.tasks.filter { $0.parentID == nil && visibleTaskIDs.contains($0.id) }, byImportance: sortByImportance)
-    }
+    var scopedTasks: [TaskItem] { taskDisplay.scoped }
+    var visibleTaskIDs: Set<UUID> { taskDisplay.ids }
+    var roots: [TaskItem] { taskDisplay.roots }
+    func boardTasks(_ status: TaskStatus) -> [TaskItem] { taskDisplay.columns[status] ?? [] }
     var availableStatuses: [TaskStatus] { TaskStatus.allCases.filter { showInProgress || $0 != .inProgress } }
-    var boardStatuses: [TaskStatus] { availableStatuses.filter { $0 != .canceled || scopedTasks.contains { $0.status == .canceled } } }
+    var boardStatuses: [TaskStatus] { availableStatuses.filter { $0 != .canceled || summaryCount(.canceled) > 0 } }
     func displayStatus(_ task: TaskItem) -> TaskStatus { !showInProgress && task.status == .inProgress ? .todo : task.status }
-    func summaryCount(_ status: TaskStatus) -> Int { scopedTasks.filter { displayStatus($0) == status }.count }
+    func summaryCount(_ status: TaskStatus) -> Int { taskDisplay.counts[status, default: 0] }
+
+    private var taskDisplay: TaskDisplay {
+        let current = workspace
+        let today = scope == "today" ? Calendar.current.startOfDay(for: .now) : nil
+        let key = TaskDisplayKey(scope: scope, search: search, status: statusFilter,
+                                 showResolved: board || showResolved, showInProgress: showInProgress,
+                                 byImportance: sortByImportance, collapsed: collapsedTasks, today: today)
+        if let cachedDisplay, cachedDisplay.key == key { return cachedDisplay }
+
+        let index = taskIndex
+        let scopeID = UUID(uuidString: key.scope)
+        let scoped: [TaskItem]
+        if key.scope == "all" { scoped = current.tasks }
+        else if let today {
+            let calendar = Calendar.current
+            scoped = current.tasks.filter { $0.dueDate.map { calendar.isDate($0, inSameDayAs: today) } == true }
+        } else if let scopeID {
+            scoped = current.tasks.filter { item in
+                guard let label = index.taskLabels[item.id] else { return false }
+                return index.labelPaths[label]?.contains { $0.id == scopeID } == true
+            }
+        } else { scoped = [] }
+
+        func displayStatus(_ task: TaskItem) -> TaskStatus {
+            !key.showInProgress && task.status == .inProgress ? .todo : task.status
+        }
+        var ids: Set<UUID> = []
+        var counts: [TaskStatus: Int] = [:]
+        for task in scoped {
+            let status = displayStatus(task)
+            counts[status, default: 0] += 1
+            guard key.status == nil || key.status == status,
+                  key.showResolved || !task.status.isResolved,
+                  key.search.isEmpty || task.title.localizedCaseInsensitiveContains(key.search)
+                      || task.notes.localizedCaseInsensitiveContains(key.search) else { continue }
+            var candidate: UUID? = task.id
+            while let id = candidate, ids.insert(id).inserted { candidate = index.byID[id]?.parentID }
+        }
+
+        let roots = current.sortedTasks((index.children[nil] ?? []).filter { ids.contains($0.id) }, byImportance: key.byImportance)
+        var rows: [TaskTreeRow] = []
+        func append(_ tasks: [TaskItem], at depth: Int) {
+            for task in tasks where key.showResolved || !task.status.isResolved {
+                rows.append(TaskTreeRow(task: task, depth: depth))
+                if !key.collapsed.contains(task.id), let children = index.children[task.id] {
+                    append(current.sortedTasks(children.filter { ids.contains($0.id) }, byImportance: key.byImportance), at: depth + 1)
+                }
+            }
+        }
+        append(roots, at: 0)
+        let display = TaskDisplay(key: key, scoped: scoped, ids: ids, roots: roots, rows: rows,
+                                  counts: counts, columns: Dictionary(grouping: roots, by: displayStatus))
+        cachedDisplay = display
+        return display
+    }
+
     func toggleStatusFilter(_ status: TaskStatus) {
         statusFilter = statusFilter == status ? nil : status
         selectedID = nil; inspectorID = nil; inlineSubtaskParent = nil
@@ -132,7 +234,8 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
         return workspace.tasks.contains(where: { $0.id == id }) ? id : nil
     }
     func openTask(_ id: UUID) {
-        for ancestor in workspace.tasks where workspace.descendants(of: ancestor.id).contains(id) { collapsedTasks.remove(ancestor.id) }
+        var parent = task(id)?.parentID
+        while let ancestor = parent { collapsedTasks.remove(ancestor); parent = task(ancestor)?.parentID }
         selectedID = id; inspectorID = id; focusNotesID = id; notesFocusRequest = UUID(); activeRegion = .editor }
     func navigateBack() {
         if inspectorID != nil || inlineSubtaskParent != nil {
@@ -243,7 +346,7 @@ enum WorkspaceView: String, CaseIterable { case list = "List", board = "Board" }
     func selectNext(_ offset: Int) {
         activeRegion = .tasks
         inspectorID = nil
-        let items = viewMode == .board ? boardStatuses.flatMap { status in roots.filter { displayStatus($0) == status } } : taskRows.map(\.task)
+        let items = viewMode == .board ? boardStatuses.flatMap { boardTasks($0) } : taskRows.map(\.task)
         guard !items.isEmpty else { return }
         let index = items.firstIndex { $0.id == selectedID } ?? (offset > 0 ? -1 : items.count)
         selectedID = items[min(max(index + offset, 0), items.count - 1)].id

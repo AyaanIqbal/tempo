@@ -44,7 +44,7 @@ struct LabelExplorer: View {
             } label: { Image(systemName: store.collapsedLabels.contains(row.id) ? "chevron.right" : "chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary).frame(width: 20, height: 32).contentShape(Rectangle()) }.buttonStyle(.tempo).disabled(!hasChildren).opacity(hasChildren ? 1 : 0)
             Button { selection = row.id } label: {
                 HStack(spacing: 8) { Circle().fill(Color.accent.opacity(0.65)).frame(width: 6, height: 6); Text(row.label.name).lineLimit(1); Spacer(minLength: 0)
-                    let count = store.workspace.taskCount(in: row.id)
+                    let count = store.openTaskCount(in: row.id)
                     if count > 0 { Text("\(count)").font(.system(size: 10)).monospacedDigit().foregroundStyle(.secondary).padding(.trailing, 5).accessibilityLabel("\(count) tasks in this label and its sub-labels") } }.font(.system(size: 12)).frame(maxWidth: .infinity, minHeight: 34, alignment: .leading).contentShape(Rectangle())
             }.buttonStyle(.tempo)
             Button { beginAdding(parent: row.id) } label: { Image(systemName: "plus").font(.system(size: 10)).foregroundStyle(.secondary).frame(width: 27, height: 34).contentShape(Rectangle()) }.buttonStyle(.tempo).help("New sub-label inside \(row.label.name)")

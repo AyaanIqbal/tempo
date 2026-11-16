@@ -80,6 +80,7 @@ public struct TaskTreeRow: Identifiable, Sendable {
     public let task: TaskItem
     public let depth: Int
     public var id: UUID { task.id }
+    public init(task: TaskItem, depth: Int) { self.task = task; self.depth = depth }
 }
 public extension Workspace {
     func taskCount(in label: UUID) -> Int {

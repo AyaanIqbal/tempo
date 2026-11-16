@@ -304,12 +304,13 @@ struct ContentView: View {
         draft = ""; acceptedLabel = nil; dismissedMatch = false; focus = .composer
     }
     private var taskList: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack { Text("YOUR TASKS").tracking(1.5); Spacer(); Text("\(store.taskRows.count) tasks") }.font(.system(size: 9, weight: .medium)).foregroundStyle(.tertiary)
-            if store.roots.isEmpty {
+        let rows = store.taskRows
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack { Text("YOUR TASKS").tracking(1.5); Spacer(); Text("\(rows.count) tasks") }.font(.system(size: 9, weight: .medium)).foregroundStyle(.tertiary)
+            if rows.isEmpty {
                 VStack(spacing: 12) { Image(systemName: store.search.isEmpty ? "sparkles" : "magnifyingglass").font(.system(size: 25)).foregroundStyle(Color.accent.opacity(0.5)); Text(store.search.isEmpty ? "A little space to get started." : "No matching tasks.").font(.system(size: 15, weight: .medium)); Text(store.search.isEmpty ? "Write your first task above. Details can wait." : "Try another search or change your filters.").font(.system(size: 12)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity).padding(.vertical, 65)
             } else {
-                LazyVStack(spacing: 0) { ForEach(store.taskRows) { row in TaskRow(store: store, task: row.task, depth: row.depth).id(row.id); if row.id != store.taskRows.last?.id { Divider().padding(.leading, 45) } } }.background(.background, in: RoundedRectangle(cornerRadius: 10)).overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary.opacity(0.5)) }
+                LazyVStack(spacing: 0) { ForEach(rows) { row in TaskRow(store: store, task: row.task, depth: row.depth).id(row.id); if row.id != rows.last?.id { Divider().padding(.leading, 45) } } }.background(.background, in: RoundedRectangle(cornerRadius: 10)).overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary.opacity(0.5)) }
             }
         }
     }
@@ -318,8 +319,8 @@ struct ContentView: View {
             HStack(alignment: .top, spacing: 12) {
                 ForEach(store.boardStatuses, id: \.self) { status in
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack { Image(systemName: status.symbol); Text(status == .done ? "Completed" : status.rawValue); Spacer(); Text("\(store.roots.filter { store.displayStatus($0) == status }.count)").foregroundStyle(.tertiary) }.font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-                        ForEach(store.roots.filter { store.displayStatus($0) == status }) { task in
+                        HStack { Image(systemName: status.symbol); Text(status == .done ? "Completed" : status.rawValue); Spacer(); Text("\(store.boardTasks(status).count)").foregroundStyle(.tertiary) }.font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                        ForEach(store.boardTasks(status)) { task in
                             VStack(alignment: .leading, spacing: 12) {
                                 Button {
                                     store.openTask(task.id)
@@ -334,7 +335,7 @@ struct ContentView: View {
                                 .background(.background, in: RoundedRectangle(cornerRadius: 8))
                                 .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(store.highlightsTask(task.id) ? Color.accent.opacity(0.6) : Color.secondary.opacity(0.08)) }
                         }
-                        if store.roots.filter({ store.displayStatus($0) == status }).isEmpty { Text("Drop a task here").font(.system(size: 11)).foregroundStyle(.tertiary).frame(maxWidth: .infinity).padding(.vertical, 30) }
+                        if store.boardTasks(status).isEmpty { Text("Drop a task here").font(.system(size: 11)).foregroundStyle(.tertiary).frame(maxWidth: .infinity).padding(.vertical, 30) }
                         Spacer(minLength: 0)
                     }.padding(12).frame(width: 210).frame(minHeight: 320).background(Color.accent.opacity(0.035), in: RoundedRectangle(cornerRadius: 9)).dropDestination(for: String.self) { ids, _ in guard let raw = ids.first, let id = UUID(uuidString: raw), store.workspace.tasks.contains(where: { $0.id == id }) else { return false }; store.status(id, status); return true }
                 }
@@ -349,13 +350,13 @@ struct TaskRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: 12) {
-            if !store.workspace.children(of: task.id).isEmpty {
+            if !store.children(of: task.id).isEmpty {
                 Button { if store.collapsedTasks.contains(task.id) { store.collapsedTasks.remove(task.id) } else { store.collapsedTasks.insert(task.id) } } label: { Image(systemName: store.collapsedTasks.contains(task.id) ? "chevron.right" : "chevron.down").font(.system(size: 9)).foregroundStyle(.secondary).frame(width: 15, height: 24).contentShape(Rectangle()) }.buttonStyle(.tempo)
             }
             Button { store.toggle(task.id) } label: { Image(systemName: store.displayStatus(task).symbol).font(.system(size: 17)).foregroundStyle(task.status.isResolved ? Color.accent.opacity(0.6) : Color.secondary.opacity(0.4)) }.buttonStyle(.tempo).help(task.status.isResolved ? "Reopen task" : "Complete task")
             VStack(alignment: .leading, spacing: 5) {
                 Text(task.title).font(.system(size: 12)).strikethrough(task.status.isResolved).foregroundStyle(task.status.isResolved ? .secondary : .primary).lineLimit(2)
-                let children = store.workspace.children(of: task.id)
+                let children = store.children(of: task.id)
                 if !children.isEmpty { Text("\(children.filter { $0.status.isResolved }.count)/\(children.count) subtasks").font(.system(size: 9)).foregroundStyle(.tertiary) }
             }
             Spacer(minLength: 0)
@@ -365,10 +366,10 @@ struct TaskRow: View {
         }.padding(15).padding(.leading, CGFloat(depth) * 22).background(store.highlightsTask(task.id) ? Color.accent.opacity(0.055) : .clear).contentShape(Rectangle()).hoverFeedback().onTapGesture { store.openTask(task.id) }
         .contextMenu { ForEach(store.boardStatuses, id: \.self) { status in Button(status.rawValue) { store.status(task.id, status) } }; Divider(); Button("Delete", role: .destructive) { store.selectedID = task.id; store.deleteSelected() } }
         if store.inspectorID == task.id {
-            InlineTaskEditor(store: store, taskID: task.id).id(task.id).padding(.leading, 38 + CGFloat(depth) * 22).padding(.trailing, 15).padding(.bottom, 12)
+            InlineTaskEditor(store: store, taskID: task.id).padding(.leading, 38 + CGFloat(depth) * 22).padding(.trailing, 15).padding(.bottom, 12)
         }
         if store.inlineSubtaskParent == task.id {
-            InlineSubtaskEntry(store: store, parentID: task.id).id(task.id).padding(.leading, 38 + CGFloat(depth) * 22).padding(.trailing, 15).padding(.bottom, 12)
+            InlineSubtaskEntry(store: store, parentID: task.id).padding(.leading, 38 + CGFloat(depth) * 22).padding(.trailing, 15).padding(.bottom, 12)
         }
         if store.highlightsTask(task.id) {
             SmartSuggestionCard(store: store, taskID: task.id).padding(.horizontal, 15 + CGFloat(depth) * 22).padding(.bottom, store.workspace.smartMatches(for: task).isEmpty ? 0 : 12)
@@ -382,7 +383,7 @@ struct TaskBadges: View {
     var body: some View {
         HStack(spacing: 8) {
             if store.properties.importance && task.importance != .none { Text(task.importance.title).foregroundStyle(task.importance == .urgent ? .red : .orange) }
-            if store.properties.labels, let name = store.workspace.labelPath(store.workspace.effectiveLabel(task)).last?.name { Text(name).foregroundStyle(Color.accent).padding(.horizontal, 7).padding(.vertical, 4).background(Color.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 4)) }
+            if store.properties.labels, let name = store.labelPath(forTask: task.id).last?.name { Text(name).foregroundStyle(Color.accent).padding(.horizontal, 7).padding(.vertical, 4).background(Color.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 4)) }
             if store.properties.dueDate, let date = task.dueDate { Text(date.formatted(.dateTime.month(.abbreviated).day())).foregroundStyle(date < Calendar.current.startOfDay(for: .now) && !task.status.isResolved ? .red : .secondary) }
             if store.properties.status { Text(store.displayStatus(task) == .done ? "Completed" : store.displayStatus(task).rawValue).foregroundStyle(.secondary) }
         }.font(.system(size: 9))
